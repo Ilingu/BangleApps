@@ -10,10 +10,11 @@ enum Operation {
   MINUS,
   MULTIPLY,
   DIVIDE,
+  POWER,
   MODULO,
 }
 
-type Signs = "+" | "-" | "*" | "/" | "%";
+type Signs = "+" | "-" | "*" | "/" | "**" | "%";
 
 interface Expr {
   a: number;
@@ -23,9 +24,28 @@ interface Expr {
   prompt: string;
 }
 
-interface Challenge {
+interface ChallengeShape {
   type: ChallengeTypes;
   prompt: string;
   solution_set: number[];
   fake_answers: number[];
+}
+
+interface TouchEvent {
+  /**
+   * 1 for left, 2 for right
+   */
+  btn: 1 | 2;
+  /**
+   * position of the touch
+   */
+  xy: {
+    x: number;
+    y: number;
+  };
+}
+type swipeValues = -1 | 0 | 1;
+interface SwipeEvent {
+  directionLR: swipeValues;
+  directionUD: swipeValues;
 }
