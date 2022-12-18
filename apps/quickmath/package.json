@@ -5,6 +5,10 @@
   "description": "Practice your math skill on your bangle.js watch!",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "url": "https://github.com/Ilingu/BangleApps.git",
+    "type": "git"
+  },
   "author": {
     "name": "@Ilingu",
     "email": "ilingu@duck.com",

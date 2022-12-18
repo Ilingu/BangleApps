@@ -46,6 +46,12 @@ interface TouchEvent {
 }
 type swipeValues = -1 | 0 | 1;
 interface SwipeEvent {
+  /**
+   * -1 for left, 1 for right, 0 for up/down
+   */
   directionLR: swipeValues;
+  /**
+   * -1 for up, 1 for down, 0 for left/right
+   */
   directionUD: swipeValues;
 }

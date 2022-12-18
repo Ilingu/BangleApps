@@ -54,20 +54,34 @@ class QuickMath {
     }
     newChallenge() {
         const challenge = new Challenge(this.complexity, "algebra");
-        const rightAnswerPos = challenge.display();
-        if (rightAnswerPos === undefined)
+        const displayInfo = challenge.display();
+        if (displayInfo === undefined || displayInfo.rightPos === undefined)
             return quit();
+        let promptOffset = 0;
+        const unsub = WatchEvents.listener.on("swipe", (ev) => {
+            console.log(ev);
+            const MAX_PROMPT = challenge.challenge.prompt.length * CHAR_LEN;
+            if (ev.directionLR === -1 && promptOffset < MAX_PROMPT)
+                promptOffset += 30;
+            if (ev.directionLR === 1 && promptOffset > 0)
+                promptOffset -= 30;
+            challenge.display({ promptOffset, answerSet: displayInfo.answerSet });
+        });
         this.waitAnswer()
             .then((answer) => {
-            console.log({ answer });
-            console.log({ isRight: rightAnswerPos === answer });
+            WatchEvents.listener.off("swipe", unsub[1]);
+            const isRight = displayInfo.rightPos === answer;
+            console.log({ isRight, answer });
         })
-            .catch(this.newChallenge);
+            .catch(() => {
+            WatchEvents.listener.off("swipe", unsub[1]);
+            this.newChallenge();
+        });
     }
     waitAnswer() {
         return new Promise((res, rej) => {
-            let unsub = ScreenEvents.listener.on("tap", (ev) => {
-                ScreenEvents.listener.off("tap", unsub[1]);
+            const unsub = WatchEvents.listener.on("tap", (ev) => {
+                WatchEvents.listener.off("tap", unsub[1]);
                 if (!ev["xy"])
                     return;
                 const isLeft = ev.xy.x < mw, isTop = ev.xy.y < mh;
@@ -84,7 +98,6 @@ class QuickMath {
         });
     }
 }
-const powRegex = /Math\.pow\(([0-9]+),([0-9]+)\)/;
 class Challenge {
     constructor(complexity, type) {
         if (type === "algebra")
@@ -94,8 +107,8 @@ class Challenge {
         else
             this.challenge = Challenge.newAlgebraChallenge(complexity);
     }
-    display() {
-        return displayChallenge(this.challenge);
+    display(options) {
+        return displayChallenge(this.challenge, options);
     }
     static newAlgebraChallenge(complexity) {
         const hardAlgebra = complexity >= Difficulty.MEDIUM;
@@ -174,10 +187,11 @@ Challenge.newEquationChallenge = (complexity) => {
         solution_set: [1, -0.5],
     };
 };
-class ScreenEvents {
+class WatchEvents {
     constructor() {
         this.tapListener = {};
         this.swipeListener = {};
+        this.btnListener = {};
         this.listenToScreenEvents();
     }
     static get listener() {
@@ -192,6 +206,8 @@ class ScreenEvents {
             this.tapListener[uid] = cb;
         else if (ev === "swipe")
             this.swipeListener[uid] = cb;
+        else if (ev === "btn_pressed")
+            this.btnListener[uid] = cb;
         else
             return [false, ""];
         return [true, uid];
@@ -211,6 +227,12 @@ class ScreenEvents {
             delete this.swipeListener[id];
             return true;
         }
+        if (ev === "btn_pressed") {
+            if (!this.btnListener[id])
+                return false;
+            delete this.btnListener[id];
+            return true;
+        }
         return false;
     }
     listenToScreenEvents() {
@@ -220,9 +242,14 @@ class ScreenEvents {
         Bangle.on("swipe", (directionLR, directionUD) => {
             Object.values(this.swipeListener).forEach((cb) => cb({ directionLR, directionUD }));
         });
+        setWatch(() => Object.values(this.btnListener).forEach((cb) => cb()), BTN, {
+            edge: "rising",
+            debounce: 50,
+            repeat: true,
+        });
     }
 }
-const displayChallenge = (challenge) => {
+const displayChallenge = (challenge, options) => {
     if (!challenge)
         return;
     console.log(challenge.solution_set);
@@ -231,31 +258,33 @@ const displayChallenge = (challenge) => {
     if (challenge.solution_set.length <= 0)
         return;
     g.clear();
-    g.setColor("#3c40c6");
+    g.setColor("#000000");
     g.fillRect(0, 0, MAX_W, MAX_H);
     g.setColor("#ffffff");
     g.fillRect(0, mh + 2, MAX_W, mh - 2);
     g.fillRect(mw - 2, 0, mw + 2, MAX_H);
-    g.setColor("#f53b57");
+    g.setColor("#f00");
     g.fillEllipse(mw - 75, mh - 35, mw + 75, mh + 35);
     g.setColor("#ffffff");
-    const FONT_SIZE = 20;
     g.setFont("Vector", FONT_SIZE);
-    g.drawString(challenge.prompt, mw - 75, mh - FONT_SIZE / 2);
+    g.drawString(challenge.prompt, mw - 75 - ((options && options.promptOffset) || 0), mh - FONT_SIZE / 2);
     const ThreeFakes = suffleArray(challenge.fake_answers).slice(0, 3);
     const OneTrue = suffleArray(challenge.solution_set)[0];
-    const answerSet = suffleArray(ThreeFakes.concat(OneTrue), 2);
+    const answerSet = (options && options.answerSet) ||
+        suffleArray(ThreeFakes.concat(OneTrue), 2);
     if (answerSet.length !== 4)
         return;
     g.drawString(answerSet[0], mw - 73, mh - 73 + FONT_SIZE / 2);
     g.drawString(answerSet[1], mw - 73, mh + 73 / 2 + FONT_SIZE / 2);
     g.drawString(answerSet[2], mw + 20, mh - 73 + FONT_SIZE / 2);
     g.drawString(answerSet[3], mw + 20, mh + 73 / 2 + FONT_SIZE / 2);
-    return answerSet.indexOf(OneTrue);
+    return { rightPos: answerSet.indexOf(OneTrue), answerSet };
 };
 const MAX_W = g.getWidth() - 1;
 const MAX_H = g.getHeight() - 1;
 const mw = Math.round(g.getWidth() / 2), mh = Math.round(g.getHeight() / 2);
+const FONT_SIZE = 20;
+const CHAR_LEN = FONT_SIZE / 2;
 const RandInt = (min, max) => {
     if (min >= max) {
         const tempmax = max;

@@ -1,4 +1,4 @@
-const powRegex = /Math\.pow\(([0-9]+),([0-9]+)\)/;
+// const powRegex = /Math\.pow\(([0-9]+),([0-9]+)\)/;
 class Challenge {
   public challenge: ChallengeShape;
 
@@ -10,8 +10,10 @@ class Challenge {
     else this.challenge = Challenge.newAlgebraChallenge(complexity);
   }
 
-  public display(): 0 | 1 | 2 | 3 | undefined {
-    return displayChallenge(this.challenge);
+  public display(
+    options?: Parameters<typeof displayChallenge>[1]
+  ): ReturnType<typeof displayChallenge> {
+    return displayChallenge(this.challenge, options);
   }
 
   public static newEquationChallenge = (
