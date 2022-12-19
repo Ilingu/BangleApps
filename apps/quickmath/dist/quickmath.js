@@ -41,6 +41,7 @@ const complexityMenu = {
 g.clear(true);
 Bangle.setLocked(false);
 Bangle.setLCDPower(1);
+Bangle.setLCDTimeout(600);
 isSupportedHW && E.showMenu(complexityMenu);
 class QuickMath {
     constructor(complexity) {
@@ -58,23 +59,22 @@ class QuickMath {
         if (displayInfo === undefined || displayInfo.rightPos === undefined)
             return quit();
         let promptOffset = 0;
-        const unsub = WatchEvents.listener.on("swipe", (ev) => {
-            console.log(ev);
-            const MAX_PROMPT = challenge.challenge.prompt.length * CHAR_LEN;
-            if (ev.directionLR === -1 && promptOffset < MAX_PROMPT)
-                promptOffset += 30;
-            if (ev.directionLR === 1 && promptOffset > 0)
-                promptOffset -= 30;
+        const unsub = WatchEvents.listener.on("drag", (ev) => {
+            if (ev.dx <= -1)
+                promptOffset += 4;
+            if (ev.dx >= 1)
+                promptOffset -= 4;
             challenge.display({ promptOffset, answerSet: displayInfo.answerSet });
         });
         this.waitAnswer()
             .then((answer) => {
-            WatchEvents.listener.off("swipe", unsub[1]);
+            WatchEvents.listener.off("drag", unsub[1]);
             const isRight = displayInfo.rightPos === answer;
-            console.log({ isRight, answer });
+            const rightAnswer = displayInfo.answerSet[displayInfo.rightPos];
+            Display.displayResult(isRight, rightAnswer).then(() => this.newChallenge());
         })
             .catch(() => {
-            WatchEvents.listener.off("swipe", unsub[1]);
+            WatchEvents.listener.off("drag", unsub[1]);
             this.newChallenge();
         });
     }
@@ -108,15 +108,75 @@ class Challenge {
             this.challenge = Challenge.newAlgebraChallenge(complexity);
     }
     display(options) {
-        return displayChallenge(this.challenge, options);
+        return Display.displayChallenge(this.challenge, options);
     }
     static newAlgebraChallenge(complexity) {
+        if (complexity === Difficulty.HARD && Math.random() >= 0.85) {
+            const op = RandOperation(true, false, false);
+            let complexA = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
+            let complexB = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
+            let answer;
+            let prompt = "";
+            switch (op) {
+                case Operation.PLUS:
+                    prompt = `${complexA.toString()} + ${complexB.toString()}`;
+                    answer = complexA.Add(complexB);
+                    break;
+                case Operation.MINUS:
+                    prompt = `${complexA.toString()} - ${complexB.toString()}`;
+                    answer = complexA.Subtract(complexB);
+                    break;
+                case Operation.MULTIPLY:
+                    prompt = `(${complexA.toString()})(${complexB.toString()})`;
+                    answer = complexA.Multiply(complexB);
+                    break;
+                case Operation.DIVIDE:
+                    complexA = complexA.Multiply(complexB);
+                    prompt = `(${complexA.toString()}) / (${complexB.toString()})`;
+                    answer = complexA.Divide(complexB);
+                    break;
+                default:
+                    answer = new ComplexNumber(1, 1);
+                    break;
+            }
+            const answerweight = answer.Abs() !== 0 ? Math.round(Math.log(answer.Abs())) : 0;
+            const RandWeight = 10 + answerweight;
+            const fake_answers = Array(10)
+                .fill(null)
+                .map(() => {
+                let derivation = new ComplexNumber(RandInt(-RandWeight, RandWeight), RandInt(-RandWeight, RandWeight));
+                let whileIt = 0;
+                while (derivation.Abs() === 0) {
+                    if (whileIt > 1e4) {
+                        return null;
+                    }
+                    whileIt++;
+                    derivation = new ComplexNumber(RandInt(-RandWeight, RandWeight), RandInt(-RandWeight, RandWeight));
+                }
+                return answer.Add(derivation);
+            })
+                .filter((x) => x)
+                .map((fa) => {
+                if (Math.random() >= 0.9)
+                    return fa.Times(-1);
+                if (Math.random() >= 0.9)
+                    return fa.Conjugate();
+                return fa;
+            })
+                .map((x) => x.toString());
+            return {
+                type: "complex_algebra",
+                prompt,
+                solution_set: [answer.toString()],
+                fake_answers: fake_answers,
+            };
+        }
         const hardAlgebra = complexity >= Difficulty.MEDIUM;
-        const opLen = RandInt(1, hardAlgebra ? 3 : 2);
+        const opLen = RandInt(1, complexity + 2);
         let expressions = [];
         let jsprompt = "", userprompt = "";
         for (let i = 0; i < opLen; i++) {
-            const op = RandOperation(hardAlgebra, hardAlgebra);
+            const op = RandOperation(true, hardAlgebra, hardAlgebra);
             const sign = OperationToSign[op.toString()];
             const derivation = hardAlgebra ? 1000 : 100;
             const tenthDerivation = derivation / 10;
@@ -127,7 +187,7 @@ class Challenge {
             }
             else if (op === Operation.POWER) {
                 a = RandInt(-tenthDerivation, tenthDerivation);
-                b = RandInt(-5, 5);
+                b = RandInt(0, 5);
             }
             else {
                 a = RandInt(-derivation, derivation);
@@ -156,25 +216,37 @@ class Challenge {
                 userprompt += `(${uprompt})`;
                 break;
             }
-            const inBetweenOp = RandOperation(false, true);
+            const inBetweenOp = RandOperation(false, false, true);
             jsprompt += `(${expr.prompt})${OperationToSign[inBetweenOp.toString()]}`;
             userprompt += `(${uprompt})${OperationToSign[inBetweenOp.toString()]}`;
         }
         const answer = computeExpr(jsprompt);
-        const answerweight = Math.log(Math.abs(answer));
+        const answerweight = answer !== 0 ? Math.log(Math.abs(answer)) : 0;
         const fake_answers = Array(10)
             .fill(null)
-            .map(() => Math.round(answer +
-            RandInt(-(hardAlgebra ? 10 : 100) - answerweight, (hardAlgebra ? 10 : 100) + answerweight)))
+            .map(() => {
+            let derivation = RandInt(-(hardAlgebra ? 10 : 100) - answerweight, (hardAlgebra ? 10 : 100) + answerweight);
+            let whileIt = 0;
+            while (derivation === 0) {
+                if (whileIt > 1e4) {
+                    return null;
+                }
+                whileIt++;
+                derivation = RandInt(-(hardAlgebra ? 10 : 100) - answerweight, (hardAlgebra ? 10 : 100) + answerweight);
+            }
+            return Math.round(answer + derivation);
+        })
+            .filter((x) => typeof x === "number")
             .map((fa) => {
             if (Math.random() >= 0.75)
                 return -fa;
             return fa;
-        });
+        })
+            .map((x) => x.toString());
         return {
             prompt: userprompt,
             type: "algebra",
-            solution_set: [answer],
+            solution_set: [`${answer}`],
             fake_answers: fake_answers,
         };
     }
@@ -183,14 +255,15 @@ Challenge.newEquationChallenge = (complexity) => {
     return {
         type: "equation",
         prompt: "-2x**2 + x + 1 = 0",
-        fake_answers: [0],
-        solution_set: [1, -0.5],
+        fake_answers: ["0"],
+        solution_set: ["1", "-0.5"],
     };
 };
 class WatchEvents {
     constructor() {
         this.tapListener = {};
         this.swipeListener = {};
+        this.dragListener = {};
         this.btnListener = {};
         this.listenToScreenEvents();
     }
@@ -206,6 +279,8 @@ class WatchEvents {
             this.tapListener[uid] = cb;
         else if (ev === "swipe")
             this.swipeListener[uid] = cb;
+        else if (ev === "drag")
+            this.dragListener[uid] = cb;
         else if (ev === "btn_pressed")
             this.btnListener[uid] = cb;
         else
@@ -227,6 +302,12 @@ class WatchEvents {
             delete this.swipeListener[id];
             return true;
         }
+        if (ev === "drag") {
+            if (!this.dragListener[id])
+                return false;
+            delete this.dragListener[id];
+            return true;
+        }
         if (ev === "btn_pressed") {
             if (!this.btnListener[id])
                 return false;
@@ -239,52 +320,152 @@ class WatchEvents {
         Bangle.on("touch", (btn, xy) => {
             Object.values(this.tapListener).forEach((cb) => cb({ btn, xy }));
         });
+        Bangle.on("drag", (ev) => {
+            Object.values(this.dragListener).forEach((cb) => cb(ev));
+        });
         Bangle.on("swipe", (directionLR, directionUD) => {
             Object.values(this.swipeListener).forEach((cb) => cb({ directionLR, directionUD }));
         });
-        setWatch(() => Object.values(this.btnListener).forEach((cb) => cb()), BTN, {
-            edge: "rising",
-            debounce: 50,
-            repeat: true,
-        });
     }
 }
-const displayChallenge = (challenge, options) => {
-    if (!challenge)
-        return;
-    console.log(challenge.solution_set);
-    if (challenge.fake_answers.length < 3)
-        return;
-    if (challenge.solution_set.length <= 0)
-        return;
-    g.clear();
-    g.setColor("#000000");
-    g.fillRect(0, 0, MAX_W, MAX_H);
-    g.setColor("#ffffff");
-    g.fillRect(0, mh + 2, MAX_W, mh - 2);
-    g.fillRect(mw - 2, 0, mw + 2, MAX_H);
-    g.setColor("#f00");
-    g.fillEllipse(mw - 75, mh - 35, mw + 75, mh + 35);
-    g.setColor("#ffffff");
-    g.setFont("Vector", FONT_SIZE);
-    g.drawString(challenge.prompt, mw - 75 - ((options && options.promptOffset) || 0), mh - FONT_SIZE / 2);
-    const ThreeFakes = suffleArray(challenge.fake_answers).slice(0, 3);
-    const OneTrue = suffleArray(challenge.solution_set)[0];
-    const answerSet = (options && options.answerSet) ||
-        suffleArray(ThreeFakes.concat(OneTrue), 2);
-    if (answerSet.length !== 4)
-        return;
-    g.drawString(answerSet[0], mw - 73, mh - 73 + FONT_SIZE / 2);
-    g.drawString(answerSet[1], mw - 73, mh + 73 / 2 + FONT_SIZE / 2);
-    g.drawString(answerSet[2], mw + 20, mh - 73 + FONT_SIZE / 2);
-    g.drawString(answerSet[3], mw + 20, mh + 73 / 2 + FONT_SIZE / 2);
-    return { rightPos: answerSet.indexOf(OneTrue), answerSet };
-};
+class Display {
+    static displayResult(isRight, rightAnswer) {
+        g.clear(true);
+        if (isRight)
+            g.setColor("#00ff00");
+        else
+            g.setColor("#ff0000");
+        g.fillRect(0, 0, MAX_W, MAX_H);
+        g.setColor("#ffffff");
+        g.setFont("Vector", FONT_SIZE);
+        g.setFontAlign(0, 0, 0);
+        const str = isRight ? "Right!" : `Wrong!\nAnswer was:\n${rightAnswer}`;
+        g.drawString(str, mw, mh);
+        return new Promise((res) => {
+            setTimeout(res, 4000);
+        });
+    }
+    static computeFont(str, containerWidth, limit) {
+        if (str.length * CHAR_LEN >= containerWidth) {
+            const perfectSize = FONT_CHAR * (containerWidth / str.length);
+            return perfectSize <= 10 && limit ? FONT_SIZE / 1.5 : perfectSize;
+        }
+        return FONT_SIZE;
+    }
+    static displayChallenge(challenge, options) {
+        if (!challenge)
+            return;
+        console.log(challenge.solution_set);
+        if (challenge.fake_answers.length < 3)
+            return;
+        if (challenge.solution_set.length <= 0)
+            return;
+        g.clear();
+        g.setColor("#000000");
+        g.fillRect(0, 0, MAX_W, MAX_H);
+        g.setColor("#ffffff");
+        g.fillRect(0, mh + 2, MAX_W, mh - 2);
+        g.fillRect(mw - 2, 0, mw + 2, MAX_H);
+        g.setColor("#f00");
+        g.fillEllipse(mw - 75, mh - 35, mw + 75, mh + 35);
+        g.setColor("#ffffff");
+        g.setFontAlign(0, 0, 0);
+        g.setFont("Vector", Display.computeFont(challenge.prompt, 150, true));
+        g.drawString(challenge.prompt, mw - ((options && options.promptOffset) || 0), mh);
+        const ThreeFakes = suffleArray(challenge.fake_answers).slice(0, 3);
+        const OneTrue = suffleArray(challenge.solution_set)[0];
+        const answerSet = (options && options.answerSet) ||
+            suffleArray(ThreeFakes.concat(OneTrue), 2);
+        if (answerSet.length !== 4)
+            return;
+        g.setFont("Vector", Display.computeFont(answerSet[0], 80, false));
+        g.drawString(answerSet[0], mw - mw / 2, mh - mh / 2);
+        g.setFont("Vector", Display.computeFont(answerSet[1], 80, false));
+        g.drawString(answerSet[1], mw - mw / 2, mh + mh / 2);
+        g.setFont("Vector", Display.computeFont(answerSet[2], 80, false));
+        g.drawString(answerSet[2], mw + mw / 2, mh - mh / 2);
+        g.setFont("Vector", Display.computeFont(answerSet[3], 80, false));
+        g.drawString(answerSet[3], mw + mw / 2, mh + mh / 2);
+        return { rightPos: answerSet.indexOf(OneTrue), answerSet };
+    }
+}
+class ComplexNumber {
+    constructor(realPart, imaginaryPart) {
+        this.Real = () => {
+            return this.n.real;
+        };
+        this.Imaginary = () => {
+            return this.n.imaginary;
+        };
+        this.Add = (n2) => {
+            const result = {
+                real: this.n.real + n2.Real(),
+                imaginary: this.n.imaginary + n2.Imaginary(),
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Subtract = (n2) => {
+            const result = {
+                real: this.n.real - n2.Real(),
+                imaginary: this.n.imaginary - n2.Imaginary(),
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Multiply = (n2) => {
+            const result = {
+                real: this.n.real * n2.Real() - this.n.imaginary * n2.Imaginary(),
+                imaginary: n2.Real() * this.n.imaginary + this.n.real * n2.Imaginary(),
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Times = (factor) => {
+            const result = {
+                real: this.n.real * factor,
+                imaginary: this.n.imaginary * factor,
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Divide = (n2) => {
+            const x2y2 = Math.pow(n2.Real(), 2) + Math.pow(n2.Imaginary(), 2);
+            const result = {
+                real: (this.n.real * n2.Real() + this.n.imaginary * n2.Imaginary()) / x2y2,
+                imaginary: (n2.Real() * this.n.imaginary - this.n.real * n2.Imaginary()) / x2y2,
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Conjugate = () => {
+            const result = {
+                real: this.n.real,
+                imaginary: -this.n.imaginary,
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.Abs = () => {
+            return Math.sqrt(Math.pow(this.n.real, 2) + Math.pow(this.n.imaginary, 2));
+        };
+        this.Exp = () => {
+            const ea = Math.exp(this.n.real);
+            const result = {
+                real: ea * Math.cos(this.n.imaginary),
+                imaginary: ea * Math.sin(this.n.imaginary),
+            };
+            return new ComplexNumber(result.real, result.imaginary);
+        };
+        this.n = {
+            real: realPart,
+            imaginary: imaginaryPart,
+        };
+    }
+    toString() {
+        return `${this.n.real}${this.n.imaginary < 0 ? "" : "+"}${this.n.imaginary}i`;
+    }
+}
 const MAX_W = g.getWidth() - 1;
 const MAX_H = g.getHeight() - 1;
 const mw = Math.round(g.getWidth() / 2), mh = Math.round(g.getHeight() / 2);
 const FONT_SIZE = 20;
-const CHAR_LEN = FONT_SIZE / 2;
+const CHAR_LEN = 150 / 14;
+const FONT_CHAR = FONT_SIZE / CHAR_LEN;
 const RandInt = (min, max) => {
     if (min >= max) {
         const tempmax = max;
@@ -294,13 +475,14 @@ const RandInt = (min, max) => {
     const delta = max - min;
     return Math.round(Math.random() * delta) + min;
 };
-const RandOperation = (power = false, modulo = false) => {
+const RandOperation = (divide = true, power = false, modulo = false) => {
     const operation = [
         Operation.PLUS,
         Operation.MINUS,
         Operation.MULTIPLY,
-        Operation.DIVIDE,
     ];
+    if (divide)
+        operation.push(Operation.DIVIDE);
     if (power)
         operation.push(Operation.POWER);
     if (modulo)

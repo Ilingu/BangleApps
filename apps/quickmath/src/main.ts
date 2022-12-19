@@ -49,7 +49,7 @@ const complexityMenu = {
 g.clear(true);
 Bangle.setLocked(false);
 Bangle.setLCDPower(1);
+Bangle.setLCDTimeout(600); // 10min timeout
 isSupportedHW && E.showMenu(complexityMenu);
 // Bangle.loadWidgets();
 // Bangle.drawWidgets();
-// Bangle.setLCDTimeout(0);

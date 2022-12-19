@@ -10,4 +10,5 @@ const FONT_SIZE = 20;
 /**
  * one character length in pixels
  */
-const CHAR_LEN = FONT_SIZE / 2;
+const CHAR_LEN = 150 / 14;
+const FONT_CHAR = FONT_SIZE / CHAR_LEN;

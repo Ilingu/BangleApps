@@ -9,13 +9,17 @@ const RandInt = (min: number, max: number): number => {
   return Math.round(Math.random() * delta) + min;
 };
 
-const RandOperation = (power = false, modulo = false): Operation => {
+const RandOperation = (
+  divide = true,
+  power = false,
+  modulo = false
+): Operation => {
   const operation: Operation[] = [
     Operation.PLUS,
     Operation.MINUS,
     Operation.MULTIPLY,
-    Operation.DIVIDE,
   ];
+  if (divide) operation.push(Operation.DIVIDE);
   if (power) operation.push(Operation.POWER);
   if (modulo) operation.push(Operation.MODULO);
 

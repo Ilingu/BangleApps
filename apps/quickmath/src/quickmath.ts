@@ -2,7 +2,7 @@
  * @class - singleton
  */
 class QuickMath {
-  private complexity: Difficulty;
+  public readonly complexity: Difficulty;
   private static gameInstance: QuickMath;
 
   private constructor(complexity: Difficulty) {
@@ -24,27 +24,27 @@ class QuickMath {
     if (displayInfo === undefined || displayInfo.rightPos === undefined)
       return quit();
 
+    // slide prompt
     let promptOffset = 0;
-    const unsub = WatchEvents.listener.on("swipe", (ev) => {
-      console.log(ev);
-      const MAX_PROMPT = challenge.challenge.prompt.length * CHAR_LEN;
-      // left
-      if (ev.directionLR === -1 && promptOffset < MAX_PROMPT)
-        promptOffset += 30;
-      // right
-      if (ev.directionLR === 1 && promptOffset > 0) promptOffset -= 30;
+    const unsub = WatchEvents.listener.on("drag", (ev) => {
+      if (ev.dx <= -1) promptOffset += 4; // left
+      if (ev.dx >= 1) promptOffset -= 4; // right
+
       challenge.display({ promptOffset, answerSet: displayInfo.answerSet });
     });
 
     // no async/await in es6 nor in espruino interpreter and ts compile of async/await doesn't work -_-
     this.waitAnswer()
       .then((answer) => {
-        WatchEvents.listener.off("swipe", unsub[1]);
+        WatchEvents.listener.off("drag", unsub[1]); // off slide
         const isRight = displayInfo.rightPos === answer;
-        console.log({ isRight, answer });
+        const rightAnswer = displayInfo.answerSet[displayInfo.rightPos];
+        Display.displayResult(isRight, rightAnswer).then(() =>
+          this.newChallenge()
+        );
       })
       .catch(() => {
-        WatchEvents.listener.off("swipe", unsub[1]); // no "finally()" on espruino interpreter -_-
+        WatchEvents.listener.off("drag", unsub[1]); // no "finally()" on espruino interpreter -_-
         this.newChallenge();
       });
   }

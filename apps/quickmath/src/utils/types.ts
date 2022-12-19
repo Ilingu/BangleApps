@@ -1,4 +1,4 @@
-type ChallengeTypes = "algebra" | "equation" | "inequation";
+type ChallengeTypes = "algebra" | "complex_algebra" | "equation";
 
 enum Difficulty {
   EASY, // simple algebra, calculus and equation (1st order, 1st-2nd degree), human computable
@@ -16,6 +16,11 @@ enum Operation {
 
 type Signs = "+" | "-" | "*" | "/" | "**" | "%";
 
+interface Complex {
+  real: number;
+  imaginary: number;
+}
+
 interface Expr {
   a: number;
   b: number;
@@ -24,11 +29,13 @@ interface Expr {
   prompt: string;
 }
 
+type TypeWatchEvents = "tap" | "swipe" | "drag" | "btn_pressed";
+
 interface ChallengeShape {
   type: ChallengeTypes;
   prompt: string;
-  solution_set: number[];
-  fake_answers: number[];
+  solution_set: string[];
+  fake_answers: string[];
 }
 
 interface TouchEvent {
@@ -54,4 +61,27 @@ interface SwipeEvent {
    * -1 for up, 1 for down, 0 for left/right
    */
   directionUD: swipeValues;
+}
+
+interface DragEvent {
+  /**
+   * x pos of the finger
+   */
+  x: number;
+  /**
+   * y pos of the finger
+   */
+  y: number;
+  /**
+   * -1 for left, 1 for right, 0 for up/down
+   */
+  dx: number;
+  /**
+   * -1 for up, 1 for down, 0 for left/right
+   */
+  dy: number;
+  /**
+   * b containing number of touch points (currently 1 or 0)
+   */
+  b: number;
 }
