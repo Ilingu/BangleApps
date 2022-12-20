@@ -1,4 +1,4 @@
-type ChallengeTypes = "algebra" | "complex_algebra" | "equation";
+type ChallengeTypes = "algebra" | "complex_algebra" | "equation" | "gcd";
 
 enum Difficulty {
   EASY, // simple algebra, calculus and equation (1st order, 1st-2nd degree), human computable
@@ -34,6 +34,7 @@ type TypeWatchEvents = "tap" | "swipe" | "drag" | "btn_pressed";
 interface ChallengeShape {
   type: ChallengeTypes;
   prompt: string;
+  answer: string;
   solution_set: string[];
   fake_answers: string[];
 }

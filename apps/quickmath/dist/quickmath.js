@@ -45,7 +45,11 @@ Bangle.setLCDTimeout(600);
 isSupportedHW && E.showMenu(complexityMenu);
 class QuickMath {
     constructor(complexity) {
+        this.score = 0;
         this.complexity = complexity;
+    }
+    get userScore() {
+        return this.score;
     }
     static newGame(complexity) {
         if (!this.gameInstance) {
@@ -71,7 +75,9 @@ class QuickMath {
             WatchEvents.listener.off("drag", unsub[1]);
             const isRight = displayInfo.rightPos === answer;
             const rightAnswer = displayInfo.answerSet[displayInfo.rightPos];
-            Display.displayResult(isRight, rightAnswer).then(() => this.newChallenge());
+            if (isRight)
+                this.score++;
+            Display.displayResult(isRight, this.score, rightAnswer).then(() => this.newChallenge());
         })
             .catch(() => {
             WatchEvents.listener.off("drag", unsub[1]);
@@ -101,78 +107,127 @@ class QuickMath {
 class Challenge {
     constructor(complexity, type) {
         if (type === "algebra")
-            this.challenge = Challenge.newAlgebraChallenge(complexity);
+            this.challenge = AlgebraChallenge.generate(complexity);
         else if (type === "equation")
-            this.challenge = Challenge.newEquationChallenge(complexity);
+            this.challenge = EquationChallenge.generate(complexity);
+        else if (type === "gcd")
+            this.challenge = GCDChallenge.generate();
         else
-            this.challenge = Challenge.newAlgebraChallenge(complexity);
+            this.challenge = AlgebraChallenge.generate(complexity);
     }
     display(options) {
         return Display.displayChallenge(this.challenge, options);
     }
-    static newAlgebraChallenge(complexity) {
-        if (complexity === Difficulty.HARD && Math.random() >= 0.85) {
-            const op = RandOperation(true, false, false);
-            let complexA = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
-            let complexB = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
-            let answer;
-            let prompt = "";
-            switch (op) {
-                case Operation.PLUS:
-                    prompt = `${complexA.toString()} + ${complexB.toString()}`;
-                    answer = complexA.Add(complexB);
-                    break;
-                case Operation.MINUS:
-                    prompt = `${complexA.toString()} - ${complexB.toString()}`;
-                    answer = complexA.Subtract(complexB);
-                    break;
-                case Operation.MULTIPLY:
-                    prompt = `(${complexA.toString()})(${complexB.toString()})`;
-                    answer = complexA.Multiply(complexB);
-                    break;
-                case Operation.DIVIDE:
-                    complexA = complexA.Multiply(complexB);
-                    prompt = `(${complexA.toString()}) / (${complexB.toString()})`;
-                    answer = complexA.Divide(complexB);
-                    break;
-                default:
-                    answer = new ComplexNumber(1, 1);
-                    break;
-            }
-            const answerweight = answer.Abs() !== 0 ? Math.round(Math.log(answer.Abs())) : 0;
-            const RandWeight = 10 + answerweight;
-            const fake_answers = Array(10)
-                .fill(null)
-                .map(() => {
-                let derivation = new ComplexNumber(RandInt(-RandWeight, RandWeight), RandInt(-RandWeight, RandWeight));
-                let whileIt = 0;
-                while (derivation.Abs() === 0) {
-                    if (whileIt > 1e4) {
-                        return null;
-                    }
-                    whileIt++;
-                    derivation = new ComplexNumber(RandInt(-RandWeight, RandWeight), RandInt(-RandWeight, RandWeight));
-                }
-                return answer.Add(derivation);
-            })
-                .filter((x) => x)
-                .map((fa) => {
-                if (Math.random() >= 0.9)
-                    return fa.Times(-1);
-                if (Math.random() >= 0.9)
-                    return fa.Conjugate();
-                return fa;
-            })
-                .map((x) => x.toString());
+}
+class GCDChallenge extends Challenge {
+    static generate() {
+        const coef = RandInt(0, 100);
+        const a = RandInt(-10, 10) * coef, b = RandInt(-10, 10) * coef;
+        const answer = gcd(a, b);
+        return {
+            type: "gcd",
+            prompt: `gcd(${a};${b})`,
+            answer: answer.toString(),
+            solution_set: [answer.toString()],
+            fake_answers: generateFakeAnswers(answer, 10),
+        };
+    }
+}
+class EquationChallenge extends Challenge {
+    static generateAffine() {
+        const isDecimal = Math.random() >= 0.9;
+        const a = isDecimal ? RandFloat(-100, 100, 1) : RandInt(-100, 100), b = isDecimal ? RandFloat(-100, 100, 1) : RandInt(-100, 100);
+        const left = `${a}*x${b < 0 ? "" : "+"}${b}`;
+        const $f_left = fx(left, "x");
+        const answer = isDecimal ? RandFloat(-100, 100, 1) : RandInt(-100, 100);
+        const right = $f_left(answer);
+        return {
+            type: "equation",
+            prompt: `${left.replace("*x", "x")}=${right}`,
+            answer: answer.toString(),
+            solution_set: [answer.toString()],
+            fake_answers: generateFakeAnswers(answer, 10),
+        };
+    }
+    static generateQuadradic(isEasy) {
+        const a = RandInt(-10, 10, true), x1 = RandInt(-10, 10), x2 = RandInt(-10, 10);
+        const b = -a * (x2 + x1), c = a * x1 * x2;
+        if (isEasy) {
+            const left = `${a}*Math.pow(x,2)${b < 0 ? "" : "+"}${b}*x`;
+            const answer = -b / a;
             return {
-                type: "complex_algebra",
-                prompt,
+                type: "equation",
+                prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
+                answer: answer.toString(),
                 solution_set: [answer.toString()],
-                fake_answers: fake_answers,
+                fake_answers: generateFakeAnswers(answer, 10),
             };
         }
+        const left = `${a}*Math.pow(x,2)${b < 0 ? "" : "+"}${b}*x${c < 0 ? "" : "+"}${c}`;
+        const answer_set = [x1, x2];
+        const answer = answer_set[RandInt(0, answer_set.length - 1)];
+        return {
+            type: "equation",
+            prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
+            answer: answer.toString(),
+            solution_set: answer_set.map((x) => x.toString()),
+            fake_answers: generateFakeAnswers(answer, 10),
+        };
+    }
+    static generate(complexity) {
+        if (complexity === Difficulty.EASY) {
+            return Math.random() >= 0.75
+                ? this.generateAffine()
+                : this.generateQuadradic(true);
+        }
+        return this.generateQuadradic(false);
+    }
+}
+class AlgebraChallenge extends Challenge {
+    static generate(complexity) {
+        if (complexity === Difficulty.HARD && Math.random() >= 0.85)
+            return this.generateComplex();
+        return this.generateReal(complexity);
+    }
+    static generateComplex() {
+        const op = RandOperation(true, false, false);
+        let complexA = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
+        let complexB = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
+        let answer;
+        let prompt = "";
+        switch (op) {
+            case Operation.PLUS:
+                prompt = `${complexA.toString()}+${complexB.toString()}`;
+                answer = complexA.Add(complexB);
+                break;
+            case Operation.MINUS:
+                prompt = `${complexA.toString()}-(${complexB.toString()})`;
+                answer = complexA.Subtract(complexB);
+                break;
+            case Operation.MULTIPLY:
+                prompt = `(${complexA.toString()})(${complexB.toString()})`;
+                answer = complexA.Multiply(complexB);
+                break;
+            case Operation.DIVIDE:
+                complexA = complexA.Multiply(complexB);
+                prompt = `(${complexA.toString()}) / (${complexB.toString()})`;
+                answer = complexA.Divide(complexB);
+                break;
+            default:
+                answer = new ComplexNumber(1, 1);
+                break;
+        }
+        return {
+            type: "complex_algebra",
+            prompt,
+            answer: answer.toString(),
+            solution_set: [answer.toString()],
+            fake_answers: genFakeComplexAnswers(answer, 10),
+        };
+    }
+    static generateReal(complexity) {
         const hardAlgebra = complexity >= Difficulty.MEDIUM;
-        const opLen = RandInt(1, complexity + 2);
+        const opLen = RandInt(1, complexity + 1);
         let expressions = [];
         let jsprompt = "", userprompt = "";
         for (let i = 0; i < opLen; i++) {
@@ -182,11 +237,11 @@ class Challenge {
             const tenthDerivation = derivation / 10;
             let a, b;
             if (op === Operation.DIVIDE) {
-                b = RandInt(-derivation, derivation);
+                b = RandInt(-derivation, derivation, true);
                 a = RandInt(-tenthDerivation, tenthDerivation) * b;
             }
             else if (op === Operation.POWER) {
-                a = RandInt(-tenthDerivation, tenthDerivation);
+                a = RandInt(-10, 10);
                 b = RandInt(0, 5);
             }
             else {
@@ -221,43 +276,64 @@ class Challenge {
             userprompt += `(${uprompt})${OperationToSign[inBetweenOp.toString()]}`;
         }
         const answer = computeExpr(jsprompt);
-        const answerweight = answer !== 0 ? Math.log(Math.abs(answer)) : 0;
-        const fake_answers = Array(10)
-            .fill(null)
-            .map(() => {
-            let derivation = RandInt(-(hardAlgebra ? 10 : 100) - answerweight, (hardAlgebra ? 10 : 100) + answerweight);
-            let whileIt = 0;
-            while (derivation === 0) {
-                if (whileIt > 1e4) {
-                    return null;
-                }
-                whileIt++;
-                derivation = RandInt(-(hardAlgebra ? 10 : 100) - answerweight, (hardAlgebra ? 10 : 100) + answerweight);
-            }
-            return Math.round(answer + derivation);
-        })
-            .filter((x) => typeof x === "number")
-            .map((fa) => {
-            if (Math.random() >= 0.75)
-                return -fa;
-            return fa;
-        })
-            .map((x) => x.toString());
         return {
             prompt: userprompt,
             type: "algebra",
+            answer: answer.toString(),
             solution_set: [`${answer}`],
-            fake_answers: fake_answers,
+            fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100),
         };
     }
 }
-Challenge.newEquationChallenge = (complexity) => {
-    return {
-        type: "equation",
-        prompt: "-2x**2 + x + 1 = 0",
-        fake_answers: ["0"],
-        solution_set: ["1", "-0.5"],
-    };
+const genFakeComplexAnswers = (answer, RandWeight) => {
+    const answerweight = answer.Abs() !== 0 ? Math.round(Math.log(answer.Abs())) : 0;
+    return Array(10)
+        .fill(null)
+        .map(() => {
+        let derivation = new ComplexNumber(RandInt(-RandWeight - answerweight, RandWeight + answerweight), RandInt(-RandWeight - answerweight, RandWeight + answerweight));
+        let whileIt = 0;
+        while (derivation.Abs() === 0) {
+            if (whileIt > 1e4) {
+                return null;
+            }
+            whileIt++;
+            derivation = new ComplexNumber(RandInt(-RandWeight - answerweight, RandWeight + answerweight), RandInt(-RandWeight - answerweight, RandWeight + answerweight));
+        }
+        return answer.Add(derivation);
+    })
+        .filter((x) => x)
+        .map((fa) => {
+        if (Math.random() >= 0.9)
+            return fa.Times(-1);
+        if (Math.random() >= 0.9)
+            return fa.Conjugate();
+        return fa;
+    })
+        .map((x) => x.toString());
+};
+const generateFakeAnswers = (answer, derivationWeight) => {
+    const answerweight = answer !== 0 ? Math.round(Math.log(Math.abs(answer))) : 0;
+    return Array(10)
+        .fill(null)
+        .map(() => {
+        let derivation = RandInt(-derivationWeight - answerweight, derivationWeight + answerweight);
+        let whileIt = 0;
+        while (derivation === 0) {
+            if (whileIt > 1e4) {
+                return null;
+            }
+            whileIt++;
+            derivation = RandInt(-derivationWeight - answerweight, derivationWeight + answerweight);
+        }
+        return Math.round(answer + derivation);
+    })
+        .filter((x) => typeof x === "number")
+        .map((fa) => {
+        if (Math.random() >= 0.75)
+            return -fa;
+        return fa;
+    })
+        .map((x) => x.toString());
 };
 class WatchEvents {
     constructor() {
@@ -329,7 +405,7 @@ class WatchEvents {
     }
 }
 class Display {
-    static displayResult(isRight, rightAnswer) {
+    static displayResult(isRight, score, rightAnswer) {
         g.clear(true);
         if (isRight)
             g.setColor("#00ff00");
@@ -339,10 +415,17 @@ class Display {
         g.setColor("#ffffff");
         g.setFont("Vector", FONT_SIZE);
         g.setFontAlign(0, 0, 0);
-        const str = isRight ? "Right!" : `Wrong!\nAnswer was:\n${rightAnswer}`;
+        const str = isRight
+            ? `Right!\nScore: ${score}`
+            : `Wrong!\nAnswer was:\n${rightAnswer}`;
         g.drawString(str, mw, mh);
         return new Promise((res) => {
-            setTimeout(res, 4000);
+            let nextQuestionTimeout = setTimeout(res, 10000);
+            const unsub = WatchEvents.listener.on("tap", () => {
+                WatchEvents.listener.off("tap", unsub[1]);
+                clearTimeout(nextQuestionTimeout);
+                res();
+            });
         });
     }
     static computeFont(str, containerWidth, limit) {
@@ -355,10 +438,10 @@ class Display {
     static displayChallenge(challenge, options) {
         if (!challenge)
             return;
-        console.log(challenge.solution_set);
+        console.log(challenge.answer);
         if (challenge.fake_answers.length < 3)
             return;
-        if (challenge.solution_set.length <= 0)
+        if (challenge.answer.length <= 0)
             return;
         g.clear();
         g.setColor("#000000");
@@ -367,25 +450,25 @@ class Display {
         g.fillRect(0, mh + 2, MAX_W, mh - 2);
         g.fillRect(mw - 2, 0, mw + 2, MAX_H);
         g.setColor("#f00");
-        g.fillEllipse(mw - 75, mh - 35, mw + 75, mh + 35);
+        g.fillEllipse(0, mh - 35, MAX_W + 1, mh + 35);
         g.setColor("#ffffff");
         g.setFontAlign(0, 0, 0);
-        g.setFont("Vector", Display.computeFont(challenge.prompt, 150, true));
+        g.setFont("Vector", Display.computeFont(challenge.prompt, 176, true));
         g.drawString(challenge.prompt, mw - ((options && options.promptOffset) || 0), mh);
         const ThreeFakes = suffleArray(challenge.fake_answers).slice(0, 3);
-        const OneTrue = suffleArray(challenge.solution_set)[0];
+        const OneTrue = challenge.answer;
         const answerSet = (options && options.answerSet) ||
             suffleArray(ThreeFakes.concat(OneTrue), 2);
         if (answerSet.length !== 4)
             return;
         g.setFont("Vector", Display.computeFont(answerSet[0], 80, false));
-        g.drawString(answerSet[0], mw - mw / 2, mh - mh / 2);
+        g.drawString(answerSet[0], mw - mw / 2, mh - mh / 2 - FONT_SIZE / 2);
         g.setFont("Vector", Display.computeFont(answerSet[1], 80, false));
-        g.drawString(answerSet[1], mw - mw / 2, mh + mh / 2);
+        g.drawString(answerSet[1], mw - mw / 2, mh + mh / 2 + FONT_SIZE / 2);
         g.setFont("Vector", Display.computeFont(answerSet[2], 80, false));
-        g.drawString(answerSet[2], mw + mw / 2, mh - mh / 2);
+        g.drawString(answerSet[2], mw + mw / 2, mh - mh / 2 - FONT_SIZE / 2);
         g.setFont("Vector", Display.computeFont(answerSet[3], 80, false));
-        g.drawString(answerSet[3], mw + mw / 2, mh + mh / 2);
+        g.drawString(answerSet[3], mw + mw / 2, mh + mh / 2 + FONT_SIZE / 2);
         return { rightPos: answerSet.indexOf(OneTrue), answerSet };
     }
 }
@@ -456,6 +539,9 @@ class ComplexNumber {
             imaginary: imaginaryPart,
         };
     }
+    IsInteger() {
+        return isInteger(this.n.real) && isInteger(this.n.imaginary);
+    }
     toString() {
         return `${this.n.real}${this.n.imaginary < 0 ? "" : "+"}${this.n.imaginary}i`;
     }
@@ -466,14 +552,27 @@ const mw = Math.round(g.getWidth() / 2), mh = Math.round(g.getHeight() / 2);
 const FONT_SIZE = 20;
 const CHAR_LEN = 150 / 14;
 const FONT_CHAR = FONT_SIZE / CHAR_LEN;
-const RandInt = (min, max) => {
+const RandInt = (min, max, nozero = false) => {
     if (min >= max) {
         const tempmax = max;
         max = min;
         min = tempmax;
     }
     const delta = max - min;
-    return Math.round(Math.random() * delta) + min;
+    let result = Math.round(Math.random() * delta) + min;
+    if (nozero)
+        while (result === 0)
+            result = Math.round(Math.random() * delta) + min;
+    return result;
+};
+const RandFloat = (min, max, fixed) => {
+    if (min >= max) {
+        const tempmax = max;
+        max = min;
+        min = tempmax;
+    }
+    const delta = max - min;
+    return parseFloat((Math.random() * delta + min).toFixed(fixed));
 };
 const RandOperation = (divide = true, power = false, modulo = false) => {
     const operation = [
@@ -500,11 +599,18 @@ const OperationToSign = {
 const computeExpr = (expr) => {
     return Function(`"use strict"; return (${expr});`)();
 };
+const fx = (fn, variable) => new Function(variable, `return (${fn})`);
 const computeDerivative = (fn, x) => {
-    const f = new Function("x", `return (${fn})`);
+    const f = fx(fn, "x");
     const h = 1e-8;
     return Math.round((f(x + h) - f(x)) / h);
 };
+const gcd = (a, b) => {
+    if (b === 0)
+        return a;
+    return gcd(Math.abs(b), Math.abs(a % b));
+};
+const sumArray = (numbers) => numbers.reduce((total, currentValue) => total + currentValue, 0);
 var Difficulty;
 (function (Difficulty) {
     Difficulty[Difficulty["EASY"] = 0] = "EASY";

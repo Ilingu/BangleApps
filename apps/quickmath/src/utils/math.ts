@@ -1,4 +1,4 @@
-const RandInt = (min: number, max: number): number => {
+const RandInt = (min: number, max: number, nozero = false): number => {
   if (min >= max) {
     const tempmax = max; // espruino interpreter doesn't support "[x, y] = [y, x];"
     max = min;
@@ -6,7 +6,21 @@ const RandInt = (min: number, max: number): number => {
   }
 
   const delta = max - min;
-  return Math.round(Math.random() * delta) + min;
+  let result = Math.round(Math.random() * delta) + min;
+  if (nozero)
+    while (result === 0) result = Math.round(Math.random() * delta) + min;
+  return result;
+};
+
+const RandFloat = (min: number, max: number, fixed: number): number => {
+  if (min >= max) {
+    const tempmax = max; // espruino interpreter doesn't support "[x, y] = [y, x];"
+    max = min;
+    min = tempmax;
+  }
+
+  const delta = max - min;
+  return parseFloat((Math.random() * delta + min).toFixed(fixed));
 };
 
 const RandOperation = (
@@ -39,9 +53,20 @@ const computeExpr = (expr: string): number => {
   return Function(`"use strict"; return (${expr});`)();
 };
 
+const fx = (fn: string, variable: "x" | "y" | "n") =>
+  new Function(variable, `return (${fn})`);
+
 // compute f'(x)
 const computeDerivative = (fn: string, x: number): number => {
-  const f = new Function("x", `return (${fn})`);
+  const f = fx(fn, "x");
   const h = 1e-8; // Step size
   return Math.round((f(x + h) - f(x)) / h); // df
 };
+
+const gcd = (a: number, b: number): number => {
+  if (b === 0) return a;
+  return gcd(Math.abs(b), Math.abs(a % b));
+};
+
+const sumArray = (numbers: number[]): number =>
+  numbers.reduce((total, currentValue) => total + currentValue, 0);

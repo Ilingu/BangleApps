@@ -88,6 +88,10 @@ class ComplexNumber {
     return new ComplexNumber(result.real, result.imaginary);
   };
 
+  public IsInteger(): boolean {
+    return isInteger(this.n.real) && isInteger(this.n.imaginary);
+  }
+
   public toString() {
     return `${this.n.real}${this.n.imaginary < 0 ? "" : "+"}${
       this.n.imaginary

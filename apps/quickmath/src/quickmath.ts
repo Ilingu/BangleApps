@@ -5,8 +5,14 @@ class QuickMath {
   public readonly complexity: Difficulty;
   private static gameInstance: QuickMath;
 
+  private score = 0;
+
   private constructor(complexity: Difficulty) {
     this.complexity = complexity;
+  }
+
+  public get userScore() {
+    return this.score;
   }
 
   static newGame(complexity: Difficulty): QuickMath {
@@ -39,7 +45,9 @@ class QuickMath {
         WatchEvents.listener.off("drag", unsub[1]); // off slide
         const isRight = displayInfo.rightPos === answer;
         const rightAnswer = displayInfo.answerSet[displayInfo.rightPos];
-        Display.displayResult(isRight, rightAnswer).then(() =>
+        if (isRight) this.score++;
+
+        Display.displayResult(isRight, this.score, rightAnswer).then(() =>
           this.newChallenge()
         );
       })
@@ -48,8 +56,6 @@ class QuickMath {
         this.newChallenge();
       });
   }
-
-  // 176x176
 
   private waitAnswer(): Promise<0 | 1 | 2 | 3> {
     return new Promise((res, rej) => {

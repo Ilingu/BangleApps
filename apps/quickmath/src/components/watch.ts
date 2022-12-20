@@ -103,8 +103,13 @@ type displayChallengeOptions = {
   answerSet?: string[];
 };
 
+// 176x176 pixels
 class Display {
-  static displayResult(isRight: boolean, rightAnswer?: string): Promise<void> {
+  static displayResult(
+    isRight: boolean,
+    score: number,
+    rightAnswer?: string
+  ): Promise<void> {
     g.clear(true);
 
     if (isRight) g.setColor("#00ff00");
@@ -115,11 +120,18 @@ class Display {
     g.setFont("Vector", FONT_SIZE);
     g.setFontAlign(0, 0, 0);
 
-    const str = isRight ? "Right!" : `Wrong!\nAnswer was:\n${rightAnswer}`;
+    const str = isRight
+      ? `Right!\nScore: ${score}`
+      : `Wrong!\nAnswer was:\n${rightAnswer}`;
     g.drawString(str, mw, mh);
 
     return new Promise<void>((res) => {
-      setTimeout(res, 4000);
+      let nextQuestionTimeout = setTimeout(res, 10_000); // 10s
+      const unsub = WatchEvents.listener.on("tap", () => {
+        WatchEvents.listener.off("tap", unsub[1]);
+        clearTimeout(nextQuestionTimeout);
+        res();
+      });
     });
   }
 
@@ -140,9 +152,9 @@ class Display {
     options?: displayChallengeOptions
   ): displayChallengeReturn | undefined {
     if (!challenge) return;
-    console.log(challenge.solution_set);
+    console.log(challenge.answer);
     if (challenge.fake_answers.length < 3) return;
-    if (challenge.solution_set.length <= 0) return;
+    if (challenge.answer.length <= 0) return;
 
     g.clear();
 
@@ -159,14 +171,14 @@ class Display {
 
     // Prompt
     g.setColor("#f00");
-    g.fillEllipse(mw - 75, mh - 35, mw + 75, mh + 35);
+    g.fillEllipse(0, mh - 35, MAX_W + 1, mh + 35);
 
     /* datas/text */
     g.setColor("#ffffff");
     g.setFontAlign(0, 0, 0);
 
     // prompt
-    g.setFont("Vector", Display.computeFont(challenge.prompt, 150, true));
+    g.setFont("Vector", Display.computeFont(challenge.prompt, 176, true));
     g.drawString(
       challenge.prompt,
       mw - ((options && options.promptOffset) || 0),
@@ -175,7 +187,7 @@ class Display {
 
     // answers
     const ThreeFakes = suffleArray(challenge.fake_answers).slice(0, 3);
-    const OneTrue = suffleArray(challenge.solution_set)[0];
+    const OneTrue = challenge.answer;
 
     const answerSet =
       (options && options.answerSet) ||
@@ -183,16 +195,16 @@ class Display {
     if (answerSet.length !== 4) return;
 
     g.setFont("Vector", Display.computeFont(answerSet[0], 80, false));
-    g.drawString(answerSet[0], mw - mw / 2, mh - mh / 2); // margin 15px top,left: 0
+    g.drawString(answerSet[0], mw - mw / 2, mh - mh / 2 - FONT_SIZE / 2); // margin 15px top,left: 0
 
     g.setFont("Vector", Display.computeFont(answerSet[1], 80, false));
-    g.drawString(answerSet[1], mw - mw / 2, mh + mh / 2); // margin 15px bottom,left: 1
+    g.drawString(answerSet[1], mw - mw / 2, mh + mh / 2 + FONT_SIZE / 2); // margin 15px bottom,left: 1
 
     g.setFont("Vector", Display.computeFont(answerSet[2], 80, false));
-    g.drawString(answerSet[2], mw + mw / 2, mh - mh / 2); // margin 15px top,right: 2
+    g.drawString(answerSet[2], mw + mw / 2, mh - mh / 2 - FONT_SIZE / 2); // margin 15px top,right: 2
 
     g.setFont("Vector", Display.computeFont(answerSet[3], 80, false));
-    g.drawString(answerSet[3], mw + mw / 2, mh + mh / 2); // margin 15px bottom,right: 3
+    g.drawString(answerSet[3], mw + mw / 2, mh + mh / 2 + FONT_SIZE / 2); // margin 15px bottom,right: 3
 
     return { rightPos: answerSet.indexOf(OneTrue) as 0 | 1 | 2 | 3, answerSet };
   }
