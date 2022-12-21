@@ -4,10 +4,6 @@ const suffleArray = <T = never>(array: T[], nb = 1): T[] => {
   return copy;
 };
 
-// Number.isInteger() not implemented in espruino interpreter
-const isInteger = (num: number): boolean =>
-  typeof num === "number" && isFinite(num) && Math.floor(num) === num;
-
 const randomUUID = (): string =>
   Date.now().toString() + Math.random().toString(36);
 

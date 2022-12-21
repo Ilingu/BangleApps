@@ -58,7 +58,7 @@ class QuickMath {
         return this.gameInstance;
     }
     newChallenge() {
-        const challenge = new Challenge(this.complexity, "algebra");
+        const challenge = new Challenge(this.complexity, "equation");
         const displayInfo = challenge.display();
         if (displayInfo === undefined || displayInfo.rightPos === undefined)
             return quit();
@@ -174,13 +174,80 @@ class EquationChallenge extends Challenge {
             fake_answers: generateFakeAnswers(answer, 10),
         };
     }
+    static generateQuotien() {
+        if (Math.random() >= 2 / 3) {
+            let k = 0, q = 0;
+            let k2 = 0, q2 = 0;
+            let k3 = 0, q3 = 0;
+            let answer_set = [];
+            for (let index = 0; index < 1e4; index++) {
+                (k = RandInt(-10, 10, true)), (q = RandInt(-10, 10, true));
+                (k2 = RandInt(-10, 10, true)), (q2 = RandInt(-10, 10, true));
+                (k3 = RandInt(-10, 10, true)), (q3 = RandInt(-10, 10, true));
+                const a = -k3 * k2, b = k - k3 * q2 - q3 * k2, c = q - q3 * q2;
+                const result = resolveQuadradic(a, b, c);
+                const isInt = !result.isComplex &&
+                    (isInteger(result.result[0]) ||
+                        isInteger(result.result[1]));
+                if (isInt) {
+                    answer_set.push(isInteger(result.result[0])
+                        ? result.result[0]
+                        : result.result[1]);
+                    break;
+                }
+            }
+            const answer = answer_set[RandInt(0, answer_set.length - 1)];
+            const pos = {
+                ltop: `${k}x${q < 0 ? "" : "+"}${q}`,
+                lbottom: `${k2}x${q2 < 0 ? "" : "+"}${q2}`,
+                right: `${k3}x${q3 < 0 ? "" : "+"}${q3}`,
+            };
+            const prompt = `(${pos.ltop})/(${pos.lbottom})=${pos.right}`;
+            return {
+                type: "equation",
+                prompt,
+                answer: answer.toString(),
+                solution_set: answer_set.map((x) => x.toString()),
+                fake_answers: generateFakeAnswers(answer, 10),
+            };
+        }
+        let top = "", bot = "";
+        let answer = 0, right = 0;
+        for (let i = Math.random() >= 0.5 ? -1e2 : 1; i < 1e4; i++) {
+            let k2 = RandInt(-10, 10, true), q2 = RandInt(-10, 10, true);
+            while (Math.pow(k2, 2) / k2 === Math.pow(q2, 2) / q2)
+                (k2 = RandInt(-10, 10, true)), (q2 = RandInt(-10, 10, true));
+            top = `${Math.pow(k2, 2)}*x+${Math.pow(q2, 2)}`;
+            bot = `${k2}*x${q2 < 0 ? "" : "+"}${q2}`;
+            let $f_top = fx(top, "x"), $f_bot = fx(bot, "x");
+            const result = $f_top(i) / $f_bot(i);
+            if (isInteger(result)) {
+                answer = i;
+                right = result;
+                break;
+            }
+        }
+        const isSwitch = Math.random() >= 0.5;
+        const prompt = `(${top})/${isSwitch ? "" : "("}${isSwitch ? right : bot}${isSwitch ? "" : ")"}=${isSwitch ? bot : right}`.replace(new RegExp("*", "gi"), "");
+        return {
+            type: "equation",
+            prompt,
+            answer: answer.toString(),
+            solution_set: [answer.toString()],
+            fake_answers: generateFakeAnswers(answer, 10),
+        };
+    }
     static generate(complexity) {
         if (complexity === Difficulty.EASY) {
             return Math.random() >= 0.75
                 ? this.generateAffine()
                 : this.generateQuadradic(true);
         }
-        return this.generateQuadradic(false);
+        if (complexity === Difficulty.MEDIUM)
+            return Math.random() >= 0.5
+                ? this.generateQuotien()
+                : this.generateQuadradic(false);
+        return this.generateQuotien();
     }
 }
 class AlgebraChallenge extends Challenge {
@@ -588,6 +655,7 @@ const RandOperation = (divide = true, power = false, modulo = false) => {
         operation.push(Operation.MODULO);
     return operation[RandInt(0, operation.length - 1)];
 };
+const isInteger = (num) => typeof num === "number" && isFinite(num) && Math.floor(num) === num;
 const OperationToSign = {
     "0": "+",
     "1": "-",
@@ -604,6 +672,15 @@ const computeDerivative = (fn, x) => {
     const f = fx(fn, "x");
     const h = 1e-8;
     return Math.round((f(x + h) - f(x)) / h);
+};
+const resolveQuadradic = (a, b, c) => {
+    const delta = Math.pow(b, 2) - 4 * a * c;
+    if (delta < 0) {
+        const x1 = new ComplexNumber(-b / (2 * a), Math.sqrt(-delta) / (2 * a));
+        return { isComplex: true, result: [x1, x1.Conjugate()] };
+    }
+    const x1 = (-b - Math.sqrt(delta)) / (2 * a), x2 = (-b + Math.sqrt(delta)) / (2 * a);
+    return { isComplex: false, result: [x1, x2] };
 };
 const gcd = (a, b) => {
     if (b === 0)
@@ -632,7 +709,6 @@ const suffleArray = (array, nb = 1) => {
         copy.sort(() => Math.random() - 0.5);
     return copy;
 };
-const isInteger = (num) => typeof num === "number" && isFinite(num) && Math.floor(num) === num;
 const randomUUID = () => Date.now().toString() + Math.random().toString(36);
 const rainbowColors = [
     "#f44336",

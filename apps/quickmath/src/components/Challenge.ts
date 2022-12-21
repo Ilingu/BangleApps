@@ -70,7 +70,7 @@ class EquationChallenge extends Challenge {
     const a = RandInt(-10, 10, true),
       x1 = RandInt(-10, 10),
       x2 = RandInt(-10, 10);
-    // a(x-x1)(x-x2) -> (ax-ax1)(x-x2) -> ax^2 -x*ax2 -x*ax1 + ax1*x2 -> ax^2 - x(ax2 + ax1) + ax1*x2
+    // a(x-x1)(x-x2) -> (ax-ax1)(x-x2) -> ax^2 -x*ax2 -x*ax1 + ax1*x2 -> ax^2 - (ax2 + ax1)x + ax1*x2
     const b = -a * (x2 + x1),
       c = a * x1 * x2;
 
@@ -87,12 +87,16 @@ class EquationChallenge extends Challenge {
       };
     }
 
+    /*
+      We want a quadratic form that when solved gives 2 integer solutions (x1,x2)
+      Therefore we'll use the factorise form of a quadratic equation: `a(x-x1)(x-x2)` with x1 and x2 integer (otherwise it's useless)
+      and then develope it giving us: ax^2 - (ax2 + ax1)x + ax1*x2
+    */
+
     const left = `${a}*Math.pow(x,2)${b < 0 ? "" : "+"}${b}*x${
       c < 0 ? "" : "+"
     }${c}`;
-    // const delta = Math.pow(b, 2) - 4 * a * c;
 
-    // 2 soliton in Real field
     const answer_set = [x1, x2];
     const answer = answer_set[RandInt(0, answer_set.length - 1)];
 
@@ -104,7 +108,138 @@ class EquationChallenge extends Challenge {
       fake_answers: generateFakeAnswers(answer, 10),
     };
   }
-  // private static generateQuotien() {}
+
+  private static generateQuotien(): ChallengeShape {
+    if (Math.random() >= 2 / 3) {
+      /* We want to solve: (kx + q) / (k2*x + q2) = k3*x + q3
+          If we try to simplify this expression it gives:
+          (-k3k2)*x² + (k-k3q2-q3k2)*x + (q-q3q2)
+          thus it's a quadratic form composed of k,q,k2,q2,k3,q3
+          formula is (a)x² + (b)x + (c): (-k3k2)*x² + (k-k3q2-q3k2)*x + (q-q3q2)
+          thus:
+            a = -k3 * k2;              |  and k2 = -a/k3; k3 = -a/k2
+            b = k - k3 * q2 - q3 * k2; |  and k = b+k3q2+q3k2; k3q2 = -b+k-q3k2; q3k2 = -b+k-k3q2
+            c = q - q3 * q2;           |  and q = c+q3q2; q2 = -c+q/q3; q3 = -c+q/q2
+          However we want a quadratic form that when solved gives 2 integer solutions (x1,x2)
+          Unfortunately, there is no way to link the factorize form of a quadratic equation (that always give int roots) to the above result (impossible system)
+          Thus we'll have to brutforce: generates random equation and solve them until you found a one with 1 integer solution.
+          The risk involved in this method is that the probability of having a integer solution equation is too low and thus that it's takes too long for the user to load,
+          Fortunately, I tried the "brute-force algorithm" a very large number of times and found that there was 5% chance that a given equation has a integer solution
+          Beside this great news, each iteration there is 2 issues: has 1 int solution (with a probability of 5%) or not (with a probability of 1-5%=95%). The repetition of n iteration is therefore a Bernouilli scheme (each iteration is independant, identical and with 2 issues) of parameter n=<number of iteration> and p=0.05
+          thus X is the variable counting the number of "success" (equation has a integer solution) follows the Binomial distribution law B(n=?;p=0.05);
+          If we visualize this on a calculator (or by hand (good luck)), we found that for n=100 (100 iterations) there are  0.5% chance of getting 0 int solution equation that ok but a bit too high, however for n=1000 we have 5E-21% chance of getting 0 int solution equation! that ridiculously impossible of getting a 0 😂 and between 100 and 1000 iteration even for a smart watch there is not much difference thus n>=1000 (I chose 10_000 to be extra secure but I could've took 1e9 and even more).
+      */
+
+      let k = 0,
+        q = 0;
+      let k2 = 0,
+        q2 = 0;
+      let k3 = 0,
+        q3 = 0;
+
+      let answer_set: number[] = [];
+      for (let index = 0; index < 1e4; index++) {
+        (k = RandInt(-10, 10, true)), (q = RandInt(-10, 10, true));
+        (k2 = RandInt(-10, 10, true)), (q2 = RandInt(-10, 10, true));
+        (k3 = RandInt(-10, 10, true)), (q3 = RandInt(-10, 10, true));
+
+        const a = -k3 * k2,
+          b = k - k3 * q2 - q3 * k2,
+          c = q - q3 * q2;
+
+        const result = resolveQuadradic(a, b, c);
+        const isInt =
+          !result.isComplex &&
+          (isInteger(result.result[0] as number) ||
+            isInteger(result.result[1] as number));
+        if (isInt) {
+          answer_set.push(
+            isInteger(result.result[0] as number)
+              ? (result.result[0] as number)
+              : (result.result[1] as number)
+          );
+          break;
+        }
+      }
+
+      const answer = answer_set[RandInt(0, answer_set.length - 1)];
+      const pos = {
+        ltop: `${k}x${q < 0 ? "" : "+"}${q}`,
+        lbottom: `${k2}x${q2 < 0 ? "" : "+"}${q2}`,
+        right: `${k3}x${q3 < 0 ? "" : "+"}${q3}`,
+      } satisfies Record<string, string>;
+      const prompt = `(${pos.ltop})/(${pos.lbottom})=${pos.right}`;
+
+      return {
+        type: "equation",
+        prompt,
+        answer: answer.toString(),
+        solution_set: answer_set.map((x) => x.toString()),
+        fake_answers: generateFakeAnswers(answer, 10),
+      };
+    }
+
+    /* We want: `(kx+q)/(k2x+q2) = p` and x and p integers
+      If we try to solve the equation above it give: x = (-q+p*q2)/(k-p*k2)
+      we want x and p integers
+      First approach is pretty simple: we have to find a way for (-q+p*q2) to be divisible by (k-p*k2) (remainder should be 0)
+      so we want: -q+p*q2 = b(k-p*k2)
+      giving us           = -bp*k2 + bk
+                              |     / |
+                              q     p q2
+      Per identification, we find that q2 = k; b = p; bpk2 = p²k2 = q
+      We can now replace these value in the original equation giving us: (q2x+p²k2)/(k2x+q2) = p
+      Unfortunately, if we try to resolve x new it'll give us: `x = p`
+      That too bad because now the user after several games will see that everytime this type of question comes up the answer will always be the value on right hand side of the equation (aka p).
+      Second/Final Approach: "fck it, I'll brute force": and by doing that I found that if we take k2 and q2 and square it for k and q that always gives at a certain point a integer x and p!
+      it looks like this: (k2²x + q2²)/(k2x + q2) = p
+      then we try (by bruteforcing) to see witch value of x gives a interger p.
+       The risk involved in this method is that the probability of having a integer solution equation is too low and thus that it's takes too long for the user to load,
+          Fortunately, I tried the "brute-force algorithm" a very large number of times and found that there was 10% chance that a given equation has a integer solution
+          Beside this great news, each iteration there is 2 issues: has 1 int solution (with a probability of 10%) or not (with a probability of 1-10%=90%). The repetition of n iteration is therefore a Bernouilli scheme (each iteration is independant, identical and with 2 issues) of parameter n=<number of iteration> and p=0.1
+          thus X is the variable counting the number of "success" (equation has a integer solution) follows the Binomial distribution law B(n=?;p=0.1);
+          If we visualize this on a calculator (or by hand (good luck)), we found that for n=100 (100 iterations) there are  0.003% chance of getting 0 int solution equation that ok but a bit too unpredictable, however for n=1000 we have 2E-44% chance of getting 0 int solution equation! that ridiculously impossible of getting a 0 😂 and between 100 and 1000 iteration even for a smart watch there is not much difference thus n>=1000 (I chose 10_000 to be extra secure but I could've took 1e9 and even more).
+    */
+
+    let top = "",
+      bot = "";
+    let answer = 0,
+      right = 0;
+    for (let i = Math.random() >= 0.5 ? -1e2 : 1; i < 1e4; i++) {
+      let k2 = RandInt(-10, 10, true),
+        q2 = RandInt(-10, 10, true);
+
+      while (Math.pow(k2, 2) / k2 === Math.pow(q2, 2) / q2)
+        (k2 = RandInt(-10, 10, true)), (q2 = RandInt(-10, 10, true));
+
+      top = `${Math.pow(k2, 2)}*x+${Math.pow(q2, 2)}`;
+      bot = `${k2}*x${q2 < 0 ? "" : "+"}${q2}`;
+      let $f_top = fx(top, "x"),
+        $f_bot = fx(bot, "x");
+
+      const result = $f_top(i) / $f_bot(i);
+
+      if (isInteger(result)) {
+        answer = i;
+        right = result;
+        break;
+      }
+    }
+
+    const isSwitch = Math.random() >= 0.5;
+    const prompt = `(${top})/${isSwitch ? "" : "("}${isSwitch ? right : bot}${
+      isSwitch ? "" : ")"
+    }=${isSwitch ? bot : right}`.replace(new RegExp("*", "gi"), "");
+
+    return {
+      type: "equation",
+      prompt,
+      answer: answer.toString(),
+      solution_set: [answer.toString()],
+      fake_answers: generateFakeAnswers(answer, 10),
+    };
+  }
+
   // private static generateCosSin() {}
   // private static generateExp() {}
   // private static generateLn() {}
@@ -120,7 +255,11 @@ class EquationChallenge extends Challenge {
         ? this.generateAffine()
         : this.generateQuadradic(true);
     }
-    return this.generateQuadradic(false);
+    if (complexity === Difficulty.MEDIUM)
+      return Math.random() >= 0.5
+        ? this.generateQuotien()
+        : this.generateQuadradic(false);
+    return this.generateQuotien();
   }
 }
 

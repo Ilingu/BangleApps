@@ -40,6 +40,10 @@ const RandOperation = (
   return operation[RandInt(0, operation.length - 1)];
 };
 
+// Number.isInteger() not implemented in espruino interpreter
+const isInteger = (num: number): boolean =>
+  typeof num === "number" && isFinite(num) && Math.floor(num) === num;
+
 const OperationToSign: Record<Operation, Signs> = {
   "0": "+",
   "1": "-",
@@ -61,6 +65,25 @@ const computeDerivative = (fn: string, x: number): number => {
   const f = fx(fn, "x");
   const h = 1e-8; // Step size
   return Math.round((f(x + h) - f(x)) / h); // df
+};
+
+const resolveQuadradic = (
+  a: number,
+  b: number,
+  c: number
+): {
+  isComplex: boolean;
+  result: [x1: number | ComplexNumber, x2: number | ComplexNumber];
+} => {
+  const delta = Math.pow(b, 2) - 4 * a * c;
+  if (delta < 0) {
+    const x1 = new ComplexNumber(-b / (2 * a), Math.sqrt(-delta) / (2 * a));
+    return { isComplex: true, result: [x1, x1.Conjugate()] };
+  }
+
+  const x1 = (-b - Math.sqrt(delta)) / (2 * a),
+    x2 = (-b + Math.sqrt(delta)) / (2 * a);
+  return { isComplex: false, result: [x1, x2] };
 };
 
 const gcd = (a: number, b: number): number => {
