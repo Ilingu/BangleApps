@@ -129,7 +129,7 @@ class GCDChallenge extends Challenge {
             prompt: `gcd(${a};${b})`,
             answer: answer.toString(),
             solution_set: [answer.toString()],
-            fake_answers: generateFakeAnswers(answer, 10),
+            fake_answers: generateFakeAnswers(answer, 10, true),
         };
     }
 }
@@ -144,9 +144,10 @@ class EquationChallenge extends Challenge {
         return {
             type: "equation",
             prompt: `${left.replace("*x", "x")}=${right}`,
+            polynomialCoef: { a, b },
             answer: answer.toString(),
             solution_set: [answer.toString()],
-            fake_answers: generateFakeAnswers(answer, 10),
+            fake_answers: generateFakeAnswers(answer, 10, true),
         };
     }
     static generateQuadradic(isEasy) {
@@ -159,8 +160,9 @@ class EquationChallenge extends Challenge {
                 type: "equation",
                 prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
                 answer: answer.toString(),
+                polynomialCoef: { a, b, c: 0 },
                 solution_set: [answer.toString()],
-                fake_answers: generateFakeAnswers(answer, 10),
+                fake_answers: generateFakeAnswers(answer, 10, true),
             };
         }
         const left = `${a}*Math.pow(x,2)${b < 0 ? "" : "+"}${b}*x${c < 0 ? "" : "+"}${c}`;
@@ -169,9 +171,10 @@ class EquationChallenge extends Challenge {
         return {
             type: "equation",
             prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
+            polynomialCoef: { a, b, c },
             answer: answer.toString(),
             solution_set: answer_set.map((x) => x.toString()),
-            fake_answers: generateFakeAnswers(answer, 10),
+            fake_answers: generateFakeAnswers(answer, 10, true),
         };
     }
     static generateQuotien() {
@@ -208,7 +211,7 @@ class EquationChallenge extends Challenge {
                 prompt,
                 answer: answer.toString(),
                 solution_set: answer_set.map((x) => x.toString()),
-                fake_answers: generateFakeAnswers(answer, 10),
+                fake_answers: generateFakeAnswers(answer, 10, true),
             };
         }
         let top = "", bot = "";
@@ -234,10 +237,74 @@ class EquationChallenge extends Challenge {
             prompt,
             answer: answer.toString(),
             solution_set: [answer.toString()],
-            fake_answers: generateFakeAnswers(answer, 10),
+            fake_answers: generateFakeAnswers(answer, 10, true),
+        };
+    }
+    static generateExp(easy) {
+        if (easy) {
+            const generate0Affine = () => {
+                const a = RandInt(-10, 10);
+                const b = RandInt(-10, 10) * a;
+                return {
+                    answer: (-b / a).toString(),
+                    prompt: `${a}x${b < 0 ? "" : "+"}${b}`,
+                };
+            };
+            const isAffine = Math.random() >= 0.5;
+            const X = isAffine
+                ? generate0Affine()
+                : this.generateQuadradic(Math.random() >= 0.5);
+            const multiply = RandInt(-1000, 1000);
+            const KAdd = RandInt(-15000, 15000);
+            const right = 1 * multiply + KAdd;
+            const prompt = `${KAdd}${multiply < 0 ? "" : "+"}${multiply}exp(${X.prompt.split("=")[0]})=${right}`;
+            const answer = X.answer;
+            return {
+                type: "equation",
+                prompt,
+                answer: answer,
+                solution_set: [answer],
+                fake_answers: generateFakeAnswers(parseInt(answer), 10, true),
+            };
+        }
+        const isExpo = Math.random() >= 0.5;
+        const d = RandInt(1, 10);
+        const a = RandInt(-10, 10, true);
+        if (Math.random() >= 0.5) {
+            const b = RandInt(-10, 10);
+            const Y = RandInt(1, 50);
+            const answer = trimFloating0((Math.log(Y) - b * (isExpo ? 1 : Math.log(d))) /
+                (a * (isExpo ? 1 : Math.log(d))), 4);
+            return {
+                type: "equation",
+                prompt: `${isExpo ? "e" : d}^${a}x${b < 0 ? "" : "+"}${b}=${Y}`,
+                answer: answer,
+                solution_set: [answer],
+                fake_answers: generateFakeAnswers(parseFloat(answer), 10, false),
+            };
+        }
+        const b = RandInt(-10, 10, true), c = RandInt(Math.ceil(Math.pow(b, 2) / (4 * a)), 10);
+        const Yextremum = Math.ceil(isExpo
+            ? Math.exp(-Math.pow(b, 2) / (4 * a) + c)
+            : Math.pow(d, -Math.pow(b, 2) / (4 * a) + c));
+        console.log({ Yextremum, a, b, c, d, isExpo });
+        const Y = RandInt(a > 0 ? Yextremum : 1, a > 0 ? 1e6 : Yextremum);
+        const result = isExpo
+            ? resolveQuadradic(a, b, -Math.log(Y) + c)
+            : resolveQuadradic(Math.log(d) * a, Math.log(d) * b, -Math.log(Y) + c * Math.log(d));
+        if (result.isComplex)
+            return this.generateExp(true);
+        const answer = trimFloating0(result.result[RandInt(0, result.result.length - 1)], 4);
+        return {
+            type: "equation",
+            prompt: `${isExpo ? "e" : d}^(${a}x^2${b < 0 ? "" : "+"}${b}x${c < 0 ? "" : "+"}${c})=${Y}`,
+            answer: answer,
+            solution_set: [answer],
+            fake_answers: generateFakeAnswers(parseFloat(answer), 10, false),
         };
     }
     static generate(complexity) {
+        return this.generateExp(false);
         if (complexity === Difficulty.EASY) {
             return Math.random() >= 0.75
                 ? this.generateAffine()
@@ -348,7 +415,7 @@ class AlgebraChallenge extends Challenge {
             type: "algebra",
             answer: answer.toString(),
             solution_set: [`${answer}`],
-            fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100),
+            fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100, true),
         };
     }
 }
@@ -378,7 +445,7 @@ const genFakeComplexAnswers = (answer, RandWeight) => {
     })
         .map((x) => x.toString());
 };
-const generateFakeAnswers = (answer, derivationWeight) => {
+const generateFakeAnswers = (answer, derivationWeight, round) => {
     const answerweight = answer !== 0 ? Math.round(Math.log(Math.abs(answer))) : 0;
     return Array(10)
         .fill(null)
@@ -392,11 +459,11 @@ const generateFakeAnswers = (answer, derivationWeight) => {
             whileIt++;
             derivation = RandInt(-derivationWeight - answerweight, derivationWeight + answerweight);
         }
-        return Math.round(answer + derivation);
+        return round ? Math.round(answer + derivation) : answer + derivation;
     })
         .filter((x) => typeof x === "number")
         .map((fa) => {
-        if (Math.random() >= 0.75)
+        if (Math.random() >= 0.8)
             return -fa;
         return fa;
     })
@@ -498,7 +565,7 @@ class Display {
     static computeFont(str, containerWidth, limit) {
         if (str.length * CHAR_LEN >= containerWidth) {
             const perfectSize = FONT_CHAR * (containerWidth / str.length);
-            return perfectSize <= 10 && limit ? FONT_SIZE / 1.5 : perfectSize;
+            return perfectSize <= 12 && limit ? FONT_SIZE / 1.5 : perfectSize;
         }
         return FONT_SIZE;
     }
@@ -687,7 +754,7 @@ const gcd = (a, b) => {
         return a;
     return gcd(Math.abs(b), Math.abs(a % b));
 };
-const sumArray = (numbers) => numbers.reduce((total, currentValue) => total + currentValue, 0);
+const trimFloating0 = (num, fixed) => !isInteger(num) ? num.toFixed(fixed).replace(/0+$/, "") : `${num}`;
 var Difficulty;
 (function (Difficulty) {
     Difficulty[Difficulty["EASY"] = 0] = "EASY";
@@ -710,6 +777,7 @@ const suffleArray = (array, nb = 1) => {
     return copy;
 };
 const randomUUID = () => Date.now().toString() + Math.random().toString(36);
+const sumArray = (numbers) => numbers.reduce((total, currentValue) => total + currentValue, 0);
 const rainbowColors = [
     "#f44336",
     "#ff9800",

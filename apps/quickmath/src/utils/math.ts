@@ -91,5 +91,5 @@ const gcd = (a: number, b: number): number => {
   return gcd(Math.abs(b), Math.abs(a % b));
 };
 
-const sumArray = (numbers: number[]): number =>
-  numbers.reduce((total, currentValue) => total + currentValue, 0);
+const trimFloating0 = (num: number, fixed: number): string =>
+  !isInteger(num) ? num.toFixed(fixed).replace(/0+$/, "") : `${num}`;

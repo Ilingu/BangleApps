@@ -7,6 +7,9 @@ const suffleArray = <T = never>(array: T[], nb = 1): T[] => {
 const randomUUID = (): string =>
   Date.now().toString() + Math.random().toString(36);
 
+const sumArray = (numbers: number[]): number =>
+  numbers.reduce((total, currentValue) => total + currentValue, 0);
+
 const rainbowColors = [
   "#f44336",
   "#ff9800",

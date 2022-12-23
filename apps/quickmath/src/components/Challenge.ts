@@ -31,7 +31,7 @@ class GCDChallenge extends Challenge {
       prompt: `gcd(${a};${b})`,
       answer: answer.toString(),
       solution_set: [answer.toString()],
-      fake_answers: generateFakeAnswers(answer, 10),
+      fake_answers: generateFakeAnswers(answer, 10, true),
     };
   }
 }
@@ -46,7 +46,9 @@ class EquationChallenge extends Challenge {
   
   */
 
-  private static generateAffine(): ChallengeShape {
+  private static generateAffine(): ChallengeShape & {
+    polynomialCoef: { a: number; b: number };
+  } {
     const isDecimal = Math.random() >= 0.9;
     const a = isDecimal ? RandFloat(-100, 100, 1) : RandInt(-100, 100),
       b = isDecimal ? RandFloat(-100, 100, 1) : RandInt(-100, 100);
@@ -60,13 +62,16 @@ class EquationChallenge extends Challenge {
     return {
       type: "equation",
       prompt: `${left.replace("*x", "x")}=${right}`,
+      polynomialCoef: { a, b },
       answer: answer.toString(),
       solution_set: [answer.toString()],
-      fake_answers: generateFakeAnswers(answer, 10),
+      fake_answers: generateFakeAnswers(answer, 10, true),
     };
   }
 
-  private static generateQuadradic(isEasy: boolean): ChallengeShape {
+  private static generateQuadradic(isEasy: boolean): ChallengeShape & {
+    polynomialCoef: { a: number; b: number; c: number };
+  } {
     const a = RandInt(-10, 10, true),
       x1 = RandInt(-10, 10),
       x2 = RandInt(-10, 10);
@@ -82,8 +87,9 @@ class EquationChallenge extends Challenge {
         type: "equation",
         prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
         answer: answer.toString(),
+        polynomialCoef: { a, b, c: 0 },
         solution_set: [answer.toString()],
-        fake_answers: generateFakeAnswers(answer, 10),
+        fake_answers: generateFakeAnswers(answer, 10, true),
       };
     }
 
@@ -103,9 +109,10 @@ class EquationChallenge extends Challenge {
     return {
       type: "equation",
       prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
+      polynomialCoef: { a, b, c },
       answer: answer.toString(),
       solution_set: answer_set.map((x) => x.toString()),
-      fake_answers: generateFakeAnswers(answer, 10),
+      fake_answers: generateFakeAnswers(answer, 10, true),
     };
   }
 
@@ -175,7 +182,7 @@ class EquationChallenge extends Challenge {
         prompt,
         answer: answer.toString(),
         solution_set: answer_set.map((x) => x.toString()),
-        fake_answers: generateFakeAnswers(answer, 10),
+        fake_answers: generateFakeAnswers(answer, 10, true),
       };
     }
 
@@ -236,15 +243,133 @@ class EquationChallenge extends Challenge {
       prompt,
       answer: answer.toString(),
       solution_set: [answer.toString()],
-      fake_answers: generateFakeAnswers(answer, 10),
+      fake_answers: generateFakeAnswers(answer, 10, true),
     };
   }
 
+  private static generateExp(easy: boolean): ChallengeShape {
+    if (easy) {
+      const generate0Affine = (): ChallengeShape => {
+        const a = RandInt(-10, 10);
+        const b = RandInt(-10, 10) * a;
+        return {
+          answer: (-b / a).toString(),
+          prompt: `${a}x${b < 0 ? "" : "+"}${b}`,
+        } as ChallengeShape;
+      };
+
+      const isAffine = Math.random() >= 0.5;
+      const X = isAffine
+        ? generate0Affine()
+        : this.generateQuadradic(Math.random() >= 0.5);
+      const multiply = RandInt(-1000, 1000);
+      const KAdd = RandInt(-15_000, 15_000);
+
+      const right = 1 * multiply + KAdd;
+      const prompt = `${KAdd}${multiply < 0 ? "" : "+"}${multiply}exp(${
+        X.prompt.split("=")[0]
+      })=${right}`;
+
+      const answer = X.answer; // exp(X) = 1 (exp(0)) <=> X = 0
+      return {
+        type: "equation",
+        prompt,
+        answer: answer,
+        solution_set: [answer],
+        fake_answers: generateFakeAnswers(parseInt(answer), 10, true),
+      };
+    }
+
+    /* Two types of challenge:
+        1. exp(ax+b)=y (affine) + with natural numbers
+        2. exp(ax²+bx+c)=y (quadratic) + with natural numbers
+        note: y=f(x)
+      --> it would've been a burden to search a formula where both x and y were natural integers so I just compute y and then resolve "x" and round it to 10^-4
+      --> Why do I resolve "x" and not compute y with a defined value of x? -> go and see the 2 functions above and you will see that for certain unpredictable value of "x" there is no real solution f(x), hower these functions are continute, thus all the f(x) (here "y") are defined thus all y in [-Inf; +Inf] have a associated x, thus I choose simplicity.
+    */
+
+    const isExpo = Math.random() >= 0.5;
+    const d = RandInt(1, 10);
+
+    const a = RandInt(-10, 10, true);
+    // affine
+    if (Math.random() >= 0.5) {
+      /* 1. exp(ax+b)=y (affine)
+        If we try to isolate "x" and resolve it we found:
+          x = (ln(y)-b)/a     defined with y>0 and a != 0
+          (note this formula works with all types of the affine function: exp(x±b) and exp(ax))
+        for the special case: `d^(ax+b)=y` where d is a natural integer number
+          x = (ln(y)-b*ln(d))/(a*ln(d))
+          (note this formula works with all types of the affine function: d^(x±b) and d^(ax))
+       */
+      const b = RandInt(-10, 10);
+      const Y = RandInt(1, 50); // there is no negative Y value (ln(Y))
+
+      const answer = trimFloating0(
+        (Math.log(Y) - b * (isExpo ? 1 : Math.log(d))) /
+          (a * (isExpo ? 1 : Math.log(d))),
+        4
+      );
+
+      return {
+        type: "equation",
+        prompt: `${isExpo ? "e" : d}^${a}x${b < 0 ? "" : "+"}${b}=${Y}`,
+        answer: answer,
+        solution_set: [answer],
+        fake_answers: generateFakeAnswers(parseFloat(answer), 10, false),
+      };
+    }
+
+    /* 2. exp(ax²+bx+c)=y (y=f(x)) (quadratic)
+        If we try to isolate "x" and resolve it we found that resolving x is the same as resolving:
+          ax²+bx-ln(y)+c = 0     quadratic of parameters: a=a; b=b; c=-ln(y)+c defined with y>0
+          we want to know the extremum of this quadratic equation (to not choose a "y" that have no x solution)
+          thus we study the derivatives of the initial funcition giving us: f'(x)=(2ax+b)*exp(ax²+bx+c)
+          The sign of f'(x) is determined by "2ax+b" (exp(X) always > 0) thus the only "root" of f'(x) and thus the "x-extremum" of f(x) is 2ax+b=0 <=> x = -b/(2a)
+          If we reinject the extremum x-value into f(x) it give the formula to compute the extremum of f(x), if a<0 it's a maximum otherwise it's a minimum: extremum of f(x) = exp((-b²/(4a)) + c)
+        for the special case: `d^(ax²+bx+c)=y` where d is a natural integer number
+          finding "x" is the same as finding the root of: a*ln(d)x² + b*ln(d)x - ln(y)+c*ln(d) = 0 
+          (or: ln(d)*(ax²+bx+c)-ln(y) = 0)
+          and the extremum formula is (maximum if a<0, minimum otherwise): f(x) = d^((-b²/(4a)) + c)
+     */
+
+    const b = RandInt(-10, 10, true),
+      c = RandInt(Math.ceil(Math.pow(b, 2) / (4 * a)), 10);
+    const Yextremum = Math.ceil(
+      isExpo
+        ? Math.exp(-Math.pow(b, 2) / (4 * a) + c)
+        : Math.pow(d, -Math.pow(b, 2) / (4 * a) + c)
+    ); // beyond Ymax there is no solution x real
+    console.log({ Yextremum, a, b, c, d, isExpo });
+    const Y = RandInt(a > 0 ? Yextremum : 1, a > 0 ? 1e6 : Yextremum); // there is no negative Y value (ln(Y))
+
+    const result = isExpo
+      ? resolveQuadradic(a, b, -Math.log(Y) + c)
+      : resolveQuadradic(
+          Math.log(d) * a,
+          Math.log(d) * b,
+          -Math.log(Y) + c * Math.log(d)
+        );
+    if (result.isComplex) return this.generateExp(true);
+    const answer = trimFloating0(
+      result.result[RandInt(0, result.result.length - 1)] as number,
+      4
+    );
+
+    return {
+      type: "equation",
+      prompt: `${isExpo ? "e" : d}^(${a}x^2${b < 0 ? "" : "+"}${b}x${
+        c < 0 ? "" : "+"
+      }${c})=${Y}`,
+      answer: answer,
+      solution_set: [answer],
+      fake_answers: generateFakeAnswers(parseFloat(answer), 10, false),
+    };
+  }
   // private static generateCosSin() {}
-  // private static generateExp() {}
-  // private static generateLn() {}
 
   public static generate(complexity: Difficulty): ChallengeShape {
+    return this.generateExp(false);
     /*
       EASY: linear/affine equation, easy 2nd degree: "5x² - 8x = 0" -> "x(5x - 8) = 0"
       MEDIUM: quadradic equation, division eq
@@ -384,7 +509,7 @@ class AlgebraChallenge extends Challenge {
       type: "algebra",
       answer: answer.toString(),
       solution_set: [`${answer}`],
-      fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100),
+      fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100, true),
     };
   }
 }
@@ -430,7 +555,8 @@ const genFakeComplexAnswers = (
 
 const generateFakeAnswers = (
   answer: number,
-  derivationWeight: number
+  derivationWeight: number,
+  round: boolean
 ): string[] => {
   const answerweight =
     answer !== 0 ? Math.round(Math.log(Math.abs(answer))) : 0;
@@ -455,11 +581,11 @@ const generateFakeAnswers = (
         );
       }
 
-      return Math.round(answer + derivation);
+      return round ? Math.round(answer + derivation) : answer + derivation;
     })
     .filter((x) => typeof x === "number")
     .map((fa) => {
-      if (Math.random() >= 0.75) return -(fa as number); // swap sign with a probability of 25%
+      if (Math.random() >= 0.8) return -(fa as number); // swap sign with a probability of 20%
       return fa as number;
     })
     .map((x) => x.toString());

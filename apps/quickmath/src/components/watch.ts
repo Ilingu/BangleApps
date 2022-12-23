@@ -142,7 +142,7 @@ class Display {
   ): number {
     if (str.length * CHAR_LEN >= containerWidth) {
       const perfectSize = FONT_CHAR * (containerWidth / str.length);
-      return perfectSize <= 10 && limit ? FONT_SIZE / 1.5 : perfectSize;
+      return perfectSize <= 12 && limit ? FONT_SIZE / 1.5 : perfectSize;
     }
     return FONT_SIZE;
   }
