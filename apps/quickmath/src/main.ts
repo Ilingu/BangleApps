@@ -27,7 +27,7 @@ const globalConfig: GameConfig = {
   difficulty: 0,
   challenge: {
     type: "equation",
-    exercise: ["affine"],
+    exercises: ["affine"],
   },
 };
 const mainMenu = {

@@ -21,7 +21,7 @@ const globalConfig = {
     difficulty: 0,
     challenge: {
         type: "equation",
-        exercise: ["affine"],
+        exercises: ["affine"],
     },
 };
 const mainMenu = {
@@ -110,9 +110,20 @@ class QuickMath {
 class Challenge {
     constructor(config) {
         const RandType = () => suffleArray(["arithmetic", "equation", "algebra"])[RandInt(0, 2)];
-        const RandExo = () => suffleArray(config.challenge.exercise)[RandInt(0, config.challenge.exercise.length - 1)];
+        const RandExoByType = (type) => {
+            const exo = generateExercises();
+            let exercises = [];
+            if (type === "equation")
+                exercises = exo.EquationExercises;
+            else if (type === "algebra")
+                exercises = exo.AlgebraExercises;
+            else
+                exercises = exo.ArithmeticExercises;
+            return suffleArray(exercises)[RandInt(0, exercises.length - 1)];
+        };
+        const RandExoUser = () => suffleArray(config.challenge.exercises)[RandInt(0, config.challenge.exercises.length - 1)];
         const type = config.challenge.type === "random" ? RandType() : config.challenge.type;
-        const exo = RandExo();
+        const exo = config.challenge.type === "random" ? RandExoByType(type) : RandExoUser();
         if (type === "equation") {
             if (exo === "affine")
                 this.challenge = EquationChallenge.generateAffine();
@@ -121,7 +132,7 @@ class Challenge {
             else if (exo === "quotient")
                 this.challenge = EquationChallenge.generateQuotien();
             else if (exo === "exp")
-                this.challenge = EquationChallenge.generateExp(config.difficulty >= Difficulty.MEDIUM);
+                this.challenge = EquationChallenge.generateExp(config.difficulty <= Difficulty.MEDIUM);
             else if (exo === "cossin")
                 this.challenge = EquationChallenge.generateCosSin();
             else
@@ -296,7 +307,7 @@ class EquationChallenge extends Challenge {
             };
         }
         const isExpo = Math.random() >= 0.5;
-        const d = RandInt(1, 10);
+        const d = RandInt(2, 10);
         const a = RandInt(-10, 10, true);
         if (Math.random() >= 0.5) {
             const b = RandInt(-10, 10);
@@ -814,6 +825,24 @@ class ComplexNumber {
         return `${this.n.real}${this.n.imaginary < 0 ? "" : "+"}${this.n.imaginary}i`;
     }
 }
+const generateExercises = () => ({
+    EquationExercises: [
+        "affine",
+        "quadratic",
+        globalConfig.difficulty >= Difficulty.MEDIUM ? "quotient" : null,
+        globalConfig.difficulty >= Difficulty.MEDIUM ? "exp" : null,
+        globalConfig.difficulty >= Difficulty.HARD ? "cossin" : null,
+    ].filter((d) => d),
+    AlgebraExercises: [
+        globalConfig.difficulty >= Difficulty.HARD ? "complex" : null,
+        globalConfig.difficulty >= Difficulty.HARD ? "ln" : null,
+        globalConfig.difficulty >= Difficulty.MEDIUM ? "power" : null,
+        "real",
+    ].filter((d) => d),
+    ArithmeticExercises: [
+        globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null,
+    ].filter((d) => d),
+});
 const renderExerciseTypeMenu = () => {
     let fields = {};
     const renderFields = (exercise) => {
@@ -821,45 +850,30 @@ const renderExerciseTypeMenu = () => {
             fields[txt] = () => {
                 E.showMenu();
                 g.clear();
-                globalConfig.challenge.exercise = [txt];
+                globalConfig.challenge.exercises = [txt];
                 QuickMath.newGame();
             };
         });
     };
-    const EquationExercises = [
-        "affine",
-        "quadratic",
-        globalConfig.difficulty >= Difficulty.MEDIUM ? "quotient" : null,
-        globalConfig.difficulty >= Difficulty.MEDIUM ? "exp" : null,
-        globalConfig.difficulty >= Difficulty.HARD ? "cossin" : null,
-    ].filter((d) => d);
-    const AlgebraExercises = [
-        globalConfig.difficulty >= Difficulty.HARD ? "complex" : null,
-        globalConfig.difficulty >= Difficulty.HARD ? "ln" : null,
-        globalConfig.difficulty >= Difficulty.MEDIUM ? "power" : null,
-        "real",
-    ].filter((d) => d);
-    const ArithmeticExercises = [
-        globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null,
-    ].filter((d) => d);
+    const exo = generateExercises();
     if (globalConfig.challenge.type === "equation")
-        renderFields(EquationExercises);
+        renderFields(exo.EquationExercises);
     if (globalConfig.challenge.type === "algebra")
-        renderFields(AlgebraExercises);
+        renderFields(exo.AlgebraExercises);
     if (globalConfig.challenge.type === "arithmetic")
-        renderFields(ArithmeticExercises);
+        renderFields(exo.ArithmeticExercises);
     const menu = Object.assign({
         "": { title: "Exercises Type", selected: 1 },
     }, fields, {
         Random: () => {
             E.showMenu();
             g.clear();
-            globalConfig.challenge.exercise =
+            globalConfig.challenge.exercises =
                 globalConfig.challenge.type === "equation"
-                    ? EquationExercises
+                    ? exo.EquationExercises
                     : globalConfig.challenge.type === "algebra"
-                        ? AlgebraExercises
-                        : ArithmeticExercises;
+                        ? exo.AlgebraExercises
+                        : exo.ArithmeticExercises;
             QuickMath.newGame();
         },
         "< Back": () => E.showMenu(renderChallengeTypeMenu()),

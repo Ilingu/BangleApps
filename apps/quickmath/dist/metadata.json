@@ -4,15 +4,24 @@
   "version": "0.01",
   "description": "Quickmath - Practice your math skills!",
   "icon": "quickmath.png",
-  "screenshots": [{ "url": "screenshot_qm.png" }],
+  "screenshots": [
+    { "url": "screenshot_qm_real.png" },
+    { "url": "screenshot_qm_complex.png" },
+    { "url": "screenshot_qm_affine.png" },
+    { "url": "screenshot_qm_quadratic.png" },
+    { "url": "screenshot_qm_quotient.png" },
+    { "url": "screenshot_qm_expo.png" },
+    { "url": "screenshot_qm_cossin.png" },
+    { "url": "screenshot_qm_ln.png" },
+    { "url": "screenshot_qm_power.png" },
+    { "url": "screenshot_qm_gcd.png" }
+  ],
   "tags": "game",
   "supports": ["BANGLEJS2"],
   "readme": "README.md",
   "allow_emulator": true,
   "storage": [
     { "name": "quickmath.app.js", "url": "quickmath.js" },
-    { "name": "quickmath.img", "url": "quickmath-icon.js", "evaluate": true },
-    { "name": "quickmath.settings.js", "url": "settings.js" }
-  ],
-  "comments": "\"data\": [{ \"name\": \"\", \"storageFile\": true }]"
+    { "name": "quickmath.img", "url": "quickmath-icon.js", "evaluate": true }
+  ]
 }

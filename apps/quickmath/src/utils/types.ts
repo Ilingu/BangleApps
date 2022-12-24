@@ -12,7 +12,11 @@ interface GameConfig {
   difficulty: Difficulty;
   challenge: {
     type: ChallengeTypes | "random";
-    exercise: (EquationChallenges | AlgebraChallenges | ArithmeticChallenges)[];
+    exercises: (
+      | EquationChallenges
+      | AlgebraChallenges
+      | ArithmeticChallenges
+    )[];
   };
 }
 

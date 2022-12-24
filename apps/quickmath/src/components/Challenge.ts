@@ -7,14 +7,26 @@ class Challenge {
       suffleArray(["arithmetic", "equation", "algebra"])[
         RandInt(0, 2)
       ] as ChallengeTypes;
-    const RandExo = () =>
-      suffleArray(config.challenge.exercise)[
-        RandInt(0, config.challenge.exercise.length - 1)
+    const RandExoByType = (type: ChallengeTypes) => {
+      const exo = generateExercises();
+      let exercises: typeof globalConfig.challenge.exercises = [];
+
+      if (type === "equation") exercises = exo.EquationExercises;
+      else if (type === "algebra") exercises = exo.AlgebraExercises;
+      else exercises = exo.ArithmeticExercises;
+
+      return suffleArray(exercises)[RandInt(0, exercises.length - 1)];
+    };
+    const RandExoUser = () =>
+      suffleArray(config.challenge.exercises)[
+        RandInt(0, config.challenge.exercises.length - 1)
       ];
 
     const type =
       config.challenge.type === "random" ? RandType() : config.challenge.type;
-    const exo = RandExo();
+    const exo =
+      config.challenge.type === "random" ? RandExoByType(type) : RandExoUser();
+
     if (type === "equation") {
       if (exo === "affine") this.challenge = EquationChallenge.generateAffine();
       else if (exo === "quadratic")
@@ -25,7 +37,7 @@ class Challenge {
         this.challenge = EquationChallenge.generateQuotien();
       else if (exo === "exp")
         this.challenge = EquationChallenge.generateExp(
-          config.difficulty >= Difficulty.MEDIUM
+          config.difficulty <= Difficulty.MEDIUM
         );
       else if (exo === "cossin")
         this.challenge = EquationChallenge.generateCosSin();
@@ -322,7 +334,7 @@ class EquationChallenge extends Challenge {
     */
 
     const isExpo = Math.random() >= 0.5;
-    const d = RandInt(1, 10);
+    const d = RandInt(2, 10); // d cannot be <= 0 (because we take its log later), but I also exclude "1" because `1^ax+b = k` where k > 1 has no solution and is not a fun equation to solve -_-
 
     const a = RandInt(-10, 10, true);
     // affine

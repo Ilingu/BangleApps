@@ -1,3 +1,27 @@
+const generateExercises = () => ({
+  EquationExercises: (
+    [
+      "affine", // easy and more
+      "quadratic", // easy and more
+      globalConfig.difficulty >= Difficulty.MEDIUM ? "quotient" : null, // medium and more
+      globalConfig.difficulty >= Difficulty.MEDIUM ? "exp" : null, // medium and more
+      globalConfig.difficulty >= Difficulty.HARD ? "cossin" : null, // hard
+    ] as EquationChallenges[]
+  ).filter((d) => d),
+  AlgebraExercises: (
+    [
+      globalConfig.difficulty >= Difficulty.HARD ? "complex" : null, // hard
+      globalConfig.difficulty >= Difficulty.HARD ? "ln" : null, // hard
+      globalConfig.difficulty >= Difficulty.MEDIUM ? "power" : null, // medium and more
+      "real", // easy and more
+    ] as AlgebraChallenges[]
+  ).filter((d) => d),
+  ArithmeticExercises: (
+    [
+      globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null, // medium and more
+    ] as ArithmeticChallenges[]
+  ).filter((d) => d),
+});
 const renderExerciseTypeMenu = () => {
   let fields: Record<string, () => void> = {};
   const renderFields = (
@@ -7,40 +31,19 @@ const renderExerciseTypeMenu = () => {
       fields[txt] = () => {
         E.showMenu();
         g.clear();
-        globalConfig.challenge.exercise = [txt];
+        globalConfig.challenge.exercises = [txt];
         QuickMath.newGame();
       };
     });
   };
 
-  const EquationExercises = (
-    [
-      "affine", // easy and more
-      "quadratic", // easy and more
-      globalConfig.difficulty >= Difficulty.MEDIUM ? "quotient" : null, // medium and more
-      globalConfig.difficulty >= Difficulty.MEDIUM ? "exp" : null, // medium and more
-      globalConfig.difficulty >= Difficulty.HARD ? "cossin" : null, // hard
-    ] as EquationChallenges[]
-  ).filter((d) => d);
-  const AlgebraExercises = (
-    [
-      globalConfig.difficulty >= Difficulty.HARD ? "complex" : null, // hard
-      globalConfig.difficulty >= Difficulty.HARD ? "ln" : null, // hard
-      globalConfig.difficulty >= Difficulty.MEDIUM ? "power" : null, // medium and more
-      "real", // easy and more
-    ] as AlgebraChallenges[]
-  ).filter((d) => d);
-  const ArithmeticExercises = (
-    [
-      globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null, // medium and more
-    ] as ArithmeticChallenges[]
-  ).filter((d) => d);
-
+  const exo = generateExercises();
   if (globalConfig.challenge.type === "equation")
-    renderFields(EquationExercises);
-  if (globalConfig.challenge.type === "algebra") renderFields(AlgebraExercises);
+    renderFields(exo.EquationExercises);
+  if (globalConfig.challenge.type === "algebra")
+    renderFields(exo.AlgebraExercises);
   if (globalConfig.challenge.type === "arithmetic")
-    renderFields(ArithmeticExercises);
+    renderFields(exo.ArithmeticExercises);
 
   // Espruino interpreter don't support the spread operator 😭
   const menu = Object.assign(
@@ -52,12 +55,12 @@ const renderExerciseTypeMenu = () => {
       Random: () => {
         E.showMenu();
         g.clear();
-        globalConfig.challenge.exercise =
+        globalConfig.challenge.exercises =
           globalConfig.challenge.type === "equation"
-            ? EquationExercises
+            ? exo.EquationExercises
             : globalConfig.challenge.type === "algebra"
-            ? AlgebraExercises
-            : ArithmeticExercises;
+            ? exo.AlgebraExercises
+            : exo.ArithmeticExercises;
         QuickMath.newGame();
       },
       "< Back": () => E.showMenu(renderChallengeTypeMenu()),
