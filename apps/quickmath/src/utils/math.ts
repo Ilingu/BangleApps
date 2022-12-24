@@ -23,12 +23,25 @@ const RandFloat = (min: number, max: number, fixed: number): number => {
   return parseFloat((Math.random() * delta + min).toFixed(fixed));
 };
 
+const RandPowerOperation = (): PowerOps => {
+  let operation: PowerOps[] = [
+    PowerOps.MULTIPLY,
+    PowerOps.DIVIDE,
+    PowerOps.INVERSE,
+    PowerOps.POWER,
+    PowerOps.SQRT,
+  ];
+  operation = suffleArray(operation, 2);
+
+  return operation[RandInt(0, operation.length - 1)];
+};
+
 const RandOperation = (
   divide = true,
   power = false,
   modulo = false
 ): Operation => {
-  const operation: Operation[] = [
+  let operation: Operation[] = [
     Operation.PLUS,
     Operation.MINUS,
     Operation.MULTIPLY,
@@ -36,6 +49,7 @@ const RandOperation = (
   if (divide) operation.push(Operation.DIVIDE);
   if (power) operation.push(Operation.POWER);
   if (modulo) operation.push(Operation.MODULO);
+  operation = suffleArray(operation, 2);
 
   return operation[RandInt(0, operation.length - 1)];
 };

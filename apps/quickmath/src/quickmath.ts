@@ -24,7 +24,7 @@ class QuickMath {
   }
 
   public newChallenge(): void {
-    const challenge = new Challenge(this.complexity, "equation");
+    const challenge = new Challenge(this.complexity, "algebra");
 
     const displayInfo = challenge.display();
     if (displayInfo === undefined || displayInfo.rightPos === undefined)

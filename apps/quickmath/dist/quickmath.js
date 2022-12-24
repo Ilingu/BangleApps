@@ -58,7 +58,7 @@ class QuickMath {
         return this.gameInstance;
     }
     newChallenge() {
-        const challenge = new Challenge(this.complexity, "equation");
+        const challenge = new Challenge(this.complexity, "algebra");
         const displayInfo = challenge.display();
         if (displayInfo === undefined || displayInfo.rightPos === undefined)
             return quit();
@@ -375,6 +375,7 @@ class EquationChallenge extends Challenge {
 }
 class AlgebraChallenge extends Challenge {
     static generate(complexity) {
+        return this.generateLnExpr();
         if (complexity === Difficulty.HARD && Math.random() >= 0.85)
             return this.generateComplex();
         return this.generateReal(complexity);
@@ -413,6 +414,80 @@ class AlgebraChallenge extends Challenge {
             answer: answer.toString(),
             solution_set: [answer.toString()],
             fake_answers: genFakeComplexAnswers(answer, 10),
+        };
+    }
+    static generateLnExpr() {
+        let prompt = "";
+        let answer;
+        for (let i = 0; i < 3; i++) {
+            let num = RandInt(1, 30);
+            if (!answer) {
+                answer = num;
+                prompt += `ln(${num})`;
+                continue;
+            }
+            const op = RandOperation();
+            if (op === Operation.PLUS) {
+                const abnum = Math.random() >= 0.8 ? RandInt(1, 5) : 1;
+                const newnum = num * abnum;
+                answer *= newnum;
+                prompt += `+ln(${abnum === 1 ? newnum : `${num}*${abnum}`})`;
+            }
+            else if (op === Operation.MINUS) {
+                const abnum = Math.random() >= 0.8 ? RandInt(1, 5) * num : 1;
+                answer /= num;
+                prompt += `-ln(${abnum === 1 ? num : `${abnum * num}/${abnum}`})`;
+            }
+            else {
+                num = RandInt(1, 5);
+                answer = Math.pow(answer, num);
+                prompt = `(${prompt})*${num}`;
+            }
+        }
+        return {
+            type: "algebra",
+            prompt,
+            answer: `ln(${answer.toString()})`,
+            solution_set: [answer.toString()],
+            fake_answers: generateFakeAnswers(answer, 10, true).map((fa) => `ln(${Math.abs(parseFloat(fa))})`),
+        };
+    }
+    static generatePowerExpr() {
+        const base = RandInt(1, 9);
+        let prompt = "";
+        let answer;
+        for (let i = 0; i < 3; i++) {
+            const num = new PowerNumber(base, RandInt(-10, 10));
+            const isInversed = Math.random() >= 0.8;
+            const isSqrt = !isInversed && Math.random() >= 0.8;
+            if (!answer) {
+                answer = num;
+                prompt += num.toString(isInversed, isSqrt);
+                continue;
+            }
+            const op = RandPowerOperation();
+            if (op === PowerOps.MULTIPLY) {
+                answer = PowerNumber.multiply(answer, num);
+                prompt += `*${num.toString(isInversed, isSqrt)}`;
+            }
+            else if (op === PowerOps.DIVIDE) {
+                answer = PowerNumber.divide(answer, num);
+                prompt += `/${num.toString(isInversed, isSqrt)}`;
+            }
+            else {
+                const b = RandInt(-10, 10);
+                answer = answer.power(b);
+                prompt = `(${prompt})^${b}`;
+            }
+        }
+        const isInversed = Math.random() >= 0.8;
+        const isSqrt = !isInversed && Math.random() >= 0.8;
+        return {
+            type: "algebra",
+            prompt,
+            answer: answer.toString(isInversed, isSqrt),
+            solution_set: [answer.toString(false, false)],
+            fake_answers: generateFakeAnswers((answer || { a: 0 }).a, 10, true).map((fa) => `${base}^${fa}`),
         };
     }
     static generateReal(complexity) {
@@ -736,6 +811,47 @@ class ComplexNumber {
         return `${this.n.real}${this.n.imaginary < 0 ? "" : "+"}${this.n.imaginary}i`;
     }
 }
+var PowerOps;
+(function (PowerOps) {
+    PowerOps[PowerOps["MULTIPLY"] = 0] = "MULTIPLY";
+    PowerOps[PowerOps["DIVIDE"] = 1] = "DIVIDE";
+    PowerOps[PowerOps["INVERSE"] = 2] = "INVERSE";
+    PowerOps[PowerOps["POWER"] = 3] = "POWER";
+    PowerOps[PowerOps["SQRT"] = 4] = "SQRT";
+})(PowerOps || (PowerOps = {}));
+class PowerNumber {
+    constructor(base, a) {
+        this.base = base;
+        this.a = a;
+    }
+    static multiply(a, b) {
+        if (a.base != b.base)
+            return null;
+        return new PowerNumber(a.base, a.a + b.a);
+    }
+    static divide(a, b) {
+        if (a.base != b.base)
+            return null;
+        return new PowerNumber(a.base, a.a - b.a);
+    }
+    inserse() {
+        return new PowerNumber(this.base, -this.a);
+    }
+    power(b) {
+        return new PowerNumber(this.base, this.a * b);
+    }
+    sqrt() {
+        return new PowerNumber(this.base, this.a / 2);
+    }
+    toString(isInversed, isSqrt) {
+        let copy = new PowerNumber(this.base, this.a);
+        if (isInversed)
+            copy = new PowerNumber(this.base, this.a * -1);
+        if (isSqrt)
+            copy = new PowerNumber(this.base, this.a * 2);
+        return `${isInversed ? "(1/" : isSqrt ? "sqrt(" : ""}${copy.base}^${copy.a}${isInversed || isSqrt ? ")" : ""}`;
+    }
+}
 const MAX_W = g.getWidth() - 1;
 const MAX_H = g.getHeight() - 1;
 const mw = Math.round(g.getWidth() / 2), mh = Math.round(g.getHeight() / 2);
@@ -764,8 +880,19 @@ const RandFloat = (min, max, fixed) => {
     const delta = max - min;
     return parseFloat((Math.random() * delta + min).toFixed(fixed));
 };
+const RandPowerOperation = () => {
+    let operation = [
+        PowerOps.MULTIPLY,
+        PowerOps.DIVIDE,
+        PowerOps.INVERSE,
+        PowerOps.POWER,
+        PowerOps.SQRT,
+    ];
+    operation = suffleArray(operation, 2);
+    return operation[RandInt(0, operation.length - 1)];
+};
 const RandOperation = (divide = true, power = false, modulo = false) => {
-    const operation = [
+    let operation = [
         Operation.PLUS,
         Operation.MINUS,
         Operation.MULTIPLY,
@@ -776,6 +903,7 @@ const RandOperation = (divide = true, power = false, modulo = false) => {
         operation.push(Operation.POWER);
     if (modulo)
         operation.push(Operation.MODULO);
+    operation = suffleArray(operation, 2);
     return operation[RandInt(0, operation.length - 1)];
 };
 const isInteger = (num) => typeof num === "number" && isFinite(num) && Math.floor(num) === num;

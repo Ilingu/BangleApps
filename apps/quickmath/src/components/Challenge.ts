@@ -455,6 +455,7 @@ class EquationChallenge extends Challenge {
 
 class AlgebraChallenge extends Challenge {
   public static generate(complexity: Difficulty): ChallengeShape {
+    return this.generateLnExpr();
     /* Complex Numbers Algebra, must be in hard mode, happen 15% of the time */
     if (complexity === Difficulty.HARD && Math.random() >= 0.85)
       return this.generateComplex();
@@ -464,7 +465,6 @@ class AlgebraChallenge extends Challenge {
   }
 
   /* Complex Numbers Algebra */
-
   private static generateComplex(): ChallengeShape {
     const op = RandOperation(true, false, false);
 
@@ -507,6 +507,92 @@ class AlgebraChallenge extends Challenge {
   }
 
   /* Real Numbers Algebra */
+  private static generateLnExpr(): ChallengeShape {
+    let prompt = "";
+    let answer: number | undefined;
+    for (let i = 0; i < 3; i++) {
+      let num = RandInt(1, 30);
+
+      if (!answer) {
+        answer = num;
+        prompt += `ln(${num})`;
+        continue;
+      }
+
+      const op = RandOperation();
+      if (op === Operation.PLUS) {
+        const abnum = Math.random() >= 0.8 ? RandInt(1, 5) : 1;
+        const newnum = num * abnum;
+
+        answer *= newnum;
+        prompt += `+ln(${abnum === 1 ? newnum : `${num}*${abnum}`})`;
+      } else if (op === Operation.MINUS) {
+        const abnum = Math.random() >= 0.8 ? RandInt(1, 5) * num : 1;
+
+        answer /= num;
+        prompt += `-ln(${abnum === 1 ? num : `${abnum * num}/${abnum}`})`;
+      } else {
+        num = RandInt(1, 5);
+        answer = Math.pow(answer, num);
+        prompt = `(${prompt})*${num}`;
+      }
+    }
+
+    answer = Math.round(answer as number);
+    return {
+      type: "algebra",
+      prompt,
+      answer: `ln(${(answer as number).toString()})`,
+      solution_set: [(answer as number).toString()],
+      fake_answers: generateFakeAnswers(answer as number, 10, true).map(
+        (fa) => `ln(${Math.abs(parseFloat(fa))})`
+      ),
+    };
+  }
+
+  private static generatePowerExpr(): ChallengeShape {
+    const base = RandInt(1, 9);
+
+    let prompt = "";
+    let answer: PowerNumber | undefined;
+    for (let i = 0; i < 3; i++) {
+      const num = new PowerNumber(base, RandInt(-10, 10));
+      const isInversed = Math.random() >= 0.8;
+      const isSqrt = !isInversed && Math.random() >= 0.8;
+
+      if (!answer) {
+        answer = num;
+        prompt += num.toString(isInversed, isSqrt);
+        continue;
+      }
+
+      const op = RandPowerOperation();
+      if (op === PowerOps.MULTIPLY) {
+        answer = PowerNumber.multiply(answer, num) as PowerNumber;
+        prompt += `*${num.toString(isInversed, isSqrt)}`;
+      } else if (op === PowerOps.DIVIDE) {
+        answer = PowerNumber.divide(answer, num) as PowerNumber;
+        prompt += `/${num.toString(isInversed, isSqrt)}`;
+      } else {
+        const b = RandInt(-10, 10);
+        answer = answer.power(b);
+        prompt = `(${prompt})^${b}`;
+      }
+    }
+
+    const isInversed = Math.random() >= 0.8;
+    const isSqrt = !isInversed && Math.random() >= 0.8;
+    return {
+      type: "algebra",
+      prompt,
+      answer: (answer as PowerNumber).toString(isInversed, isSqrt),
+      solution_set: [(answer as PowerNumber).toString(false, false)],
+      fake_answers: generateFakeAnswers((answer || { a: 0 }).a, 10, true).map(
+        (fa) => `${base}^${fa}`
+      ),
+    };
+  }
+
   private static generateReal(complexity: Difficulty): ChallengeShape {
     const hardAlgebra = complexity >= Difficulty.MEDIUM;
     const opLen = RandInt(1, complexity + 1); // easy will be 1, medium 2, hard 3 expressions
