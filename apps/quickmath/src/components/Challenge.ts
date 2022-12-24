@@ -366,10 +366,75 @@ class EquationChallenge extends Challenge {
       fake_answers: generateFakeAnswers(parseFloat(answer), 10, false),
     };
   }
-  // private static generateCosSin() {}
+
+  private static generateCosSin(): ChallengeShape {
+    type opsType = ("cos" | "sin" | "tan")[];
+    const ops: opsType = suffleArray(["cos", "sin", "tan"], 2);
+
+    let jsPrompt = "";
+    let prompt = "";
+
+    const exprSize = RandInt(1, 3);
+    for (let i = 0; i < exprSize; i++) {
+      const multiply = Math.random() >= 0.8 ? RandInt(-10, 10, true) : 1;
+      const op = ops[i];
+
+      if (op === "cos") {
+        jsPrompt += `${multiply}*Math.cos(x*2*Math.PI/360)+`;
+        prompt += `${multiply === 1 ? "" : multiply}cos(x)+`;
+      } else if (op === "sin") {
+        jsPrompt += `${multiply}*Math.sin(x*2*Math.PI/360)+`;
+        prompt += `${multiply === 1 ? "" : multiply}sin(x)+`;
+      } else {
+        jsPrompt += `${multiply}*Math.tan(x*2*Math.PI/360)+`;
+        prompt += `${multiply === 1 ? "" : multiply}tan(x)+`;
+      }
+    }
+    jsPrompt = jsPrompt
+      .replace(/[\+-]+/gi, "-")
+      .replace(/[\+]+$/, "")
+      .replace(/[-]+$/, "");
+    prompt = prompt
+      .replace(/[\+-]+/gi, "-")
+      .replace(/[\+]+$/, "")
+      .replace(/[-]+$/, "");
+
+    const rightInterval = prompt.includes("tan") ? 100 : exprSize >= 2 ? 2 : 1;
+    const right = RandInt(-rightInterval, rightInterval);
+    prompt += `=${right}`;
+
+    let closestGap: number | undefined;
+    let closestAnswer: number | undefined;
+
+    const $f_expr = fx(jsPrompt, "x");
+    for (let angle = 0; angle <= 360; angle++) {
+      const gap = Math.abs($f_expr(angle) - right);
+      if (gap < (closestGap === undefined ? gap + 1 : closestGap)) {
+        closestGap = gap;
+        closestAnswer = angle;
+      }
+    }
+
+    console.log({ closestAnswer, closestGap, prompt, jsPrompt });
+    if (
+      !prompt.includes("tan") &&
+      (closestGap === undefined ? 1 : closestGap) >= 1
+    )
+      closestAnswer = undefined;
+
+    return {
+      type: "equation",
+      prompt,
+      answer: (closestAnswer === undefined ? NaN : closestAnswer).toString(), // no "??" in espruino interpreter -_-
+      solution_set: [
+        (closestAnswer === undefined ? NaN : closestAnswer).toString(),
+      ],
+      fake_answers: generateFakeAnswers(closestAnswer || 0, 10, false),
+    };
+  }
 
   public static generate(complexity: Difficulty): ChallengeShape {
-    return this.generateExp(false);
+    return this.generateCosSin();
     /*
       EASY: linear/affine equation, easy 2nd degree: "5x² - 8x = 0" -> "x(5x - 8) = 0"
       MEDIUM: quadradic equation, division eq
