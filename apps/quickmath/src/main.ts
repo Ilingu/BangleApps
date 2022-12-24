@@ -22,34 +22,35 @@ if (!isSupportedHW) {
   }, 1000);
 }
 
-let game: QuickMath;
-const startGame = (complexity: Difficulty) => {
-  game = QuickMath.newGame(complexity);
-  game.newChallenge();
-};
-
 /* Initialisation */
-const complexityMenu = {
+const globalConfig: GameConfig = {
+  difficulty: 0,
+  challenge: {
+    type: "equation",
+    exercise: ["affine"],
+  },
+};
+const mainMenu = {
   "": { title: "Challenge complexity", selected: 1 },
   "Easy (Simple math)": () => {
-    E.showMenu();
-    startGame(Difficulty.EASY);
+    globalConfig.difficulty = Difficulty.EASY;
+    E.showMenu(renderChallengeTypeMenu());
   },
   "Medium (Advanced math)": () => {
-    E.showMenu();
-    startGame(Difficulty.MEDIUM);
+    globalConfig.difficulty = Difficulty.MEDIUM;
+    E.showMenu(renderChallengeTypeMenu());
   },
   "Hard (Expert math)": () => {
-    E.showMenu();
-    startGame(Difficulty.HARD);
+    globalConfig.difficulty = Difficulty.HARD;
+    E.showMenu(renderChallengeTypeMenu());
   },
-  "< Exit": E.showMenu,
+  "< Exit": quit,
 };
 
 g.clear(true);
 Bangle.setLocked(false);
 Bangle.setLCDPower(1);
 Bangle.setLCDTimeout(600); // 10min timeout
-isSupportedHW && E.showMenu(complexityMenu);
+isSupportedHW && E.showMenu(mainMenu);
 // Bangle.loadWidgets();
 // Bangle.drawWidgets();

@@ -1,4 +1,20 @@
-type ChallengeTypes = "algebra" | "complex_algebra" | "equation" | "gcd";
+type ChallengeTypes = "arithmetic" | "equation" | "algebra";
+type EquationChallenges =
+  | "affine"
+  | "quadratic"
+  | "quotient"
+  | "exp"
+  | "cossin";
+type AlgebraChallenges = "complex" | "ln" | "power" | "real";
+type ArithmeticChallenges = "gcd";
+
+interface GameConfig {
+  difficulty: Difficulty;
+  challenge: {
+    type: ChallengeTypes | "random";
+    exercise: (EquationChallenges | AlgebraChallenges | ArithmeticChallenges)[];
+  };
+}
 
 enum Difficulty {
   EASY, // simple algebra, calculus and equation (1st order, 1st-2nd degree), human computable
@@ -32,7 +48,6 @@ interface Expr {
 type TypeWatchEvents = "tap" | "swipe" | "drag" | "btn_pressed";
 
 interface ChallengeShape {
-  type: ChallengeTypes;
   prompt: string;
   answer: string;
   solution_set: string[];

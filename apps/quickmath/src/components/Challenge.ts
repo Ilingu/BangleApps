@@ -2,13 +2,53 @@
 class Challenge {
   public readonly challenge: ChallengeShape;
 
-  constructor(complexity: Difficulty, type: ChallengeTypes) {
-    if (type === "algebra")
-      this.challenge = AlgebraChallenge.generate(complexity);
-    else if (type === "equation")
-      this.challenge = EquationChallenge.generate(complexity);
-    else if (type === "gcd") this.challenge = GCDChallenge.generate();
-    else this.challenge = AlgebraChallenge.generate(complexity);
+  constructor(config: GameConfig) {
+    const RandType = () =>
+      suffleArray(["arithmetic", "equation", "algebra"])[
+        RandInt(0, 2)
+      ] as ChallengeTypes;
+    const RandExo = () =>
+      suffleArray(config.challenge.exercise)[
+        RandInt(0, config.challenge.exercise.length - 1)
+      ];
+
+    const type =
+      config.challenge.type === "random" ? RandType() : config.challenge.type;
+    const exo = RandExo();
+    if (type === "equation") {
+      if (exo === "affine") this.challenge = EquationChallenge.generateAffine();
+      else if (exo === "quadratic")
+        this.challenge = EquationChallenge.generateQuadradic(
+          config.difficulty === Difficulty.EASY
+        );
+      else if (exo === "quotient")
+        this.challenge = EquationChallenge.generateQuotien();
+      else if (exo === "exp")
+        this.challenge = EquationChallenge.generateExp(
+          config.difficulty >= Difficulty.MEDIUM
+        );
+      else if (exo === "cossin")
+        this.challenge = EquationChallenge.generateCosSin();
+      else this.challenge = Challenge.defaultChallenge();
+    } else if (type === "algebra") {
+      if (exo === "complex")
+        this.challenge = AlgebraChallenge.generateComplex();
+      else if (exo === "real")
+        this.challenge = AlgebraChallenge.generateReal(config.difficulty);
+      else if (exo === "ln") this.challenge = AlgebraChallenge.generateLnExpr();
+      else if (exo === "power")
+        this.challenge = AlgebraChallenge.generatePowerExpr();
+      else this.challenge = Challenge.defaultChallenge();
+    } else this.challenge = ArithmeticChallenge.generateGCD();
+  }
+
+  private static defaultChallenge(): ChallengeShape {
+    return {
+      prompt: "NaN",
+      answer: NaN.toString(),
+      solution_set: [NaN.toString()],
+      fake_answers: [NaN.toString(), NaN.toString(), NaN.toString()],
+    };
   }
 
   public display(
@@ -18,8 +58,8 @@ class Challenge {
   }
 }
 
-class GCDChallenge extends Challenge {
-  public static generate(): ChallengeShape {
+class ArithmeticChallenge extends Challenge {
+  public static generateGCD(): ChallengeShape {
     const coef = RandInt(0, 100);
     const a = RandInt(-10, 10) * coef,
       b = RandInt(-10, 10) * coef;
@@ -27,7 +67,6 @@ class GCDChallenge extends Challenge {
     const answer = gcd(a, b);
 
     return {
-      type: "gcd",
       prompt: `gcd(${a};${b})`,
       answer: answer.toString(),
       solution_set: [answer.toString()],
@@ -46,7 +85,7 @@ class EquationChallenge extends Challenge {
   
   */
 
-  private static generateAffine(): ChallengeShape & {
+  public static generateAffine(): ChallengeShape & {
     polynomialCoef: { a: number; b: number };
   } {
     const isDecimal = Math.random() >= 0.9;
@@ -60,7 +99,6 @@ class EquationChallenge extends Challenge {
     const right = $f_left(answer); // we computer "left" expr with `x = answer`
 
     return {
-      type: "equation",
       prompt: `${left.replace("*x", "x")}=${right}`,
       polynomialCoef: { a, b },
       answer: answer.toString(),
@@ -69,7 +107,7 @@ class EquationChallenge extends Challenge {
     };
   }
 
-  private static generateQuadradic(isEasy: boolean): ChallengeShape & {
+  public static generateQuadradic(isEasy: boolean): ChallengeShape & {
     polynomialCoef: { a: number; b: number; c: number };
   } {
     const a = RandInt(-10, 10, true),
@@ -84,7 +122,6 @@ class EquationChallenge extends Challenge {
       const answer = -b / a;
 
       return {
-        type: "equation",
         prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
         answer: answer.toString(),
         polynomialCoef: { a, b, c: 0 },
@@ -107,7 +144,6 @@ class EquationChallenge extends Challenge {
     const answer = answer_set[RandInt(0, answer_set.length - 1)];
 
     return {
-      type: "equation",
       prompt: `${left.replace("*x", "x").replace("*Math.pow(x,2)", "x^2")}=0`,
       polynomialCoef: { a, b, c },
       answer: answer.toString(),
@@ -116,7 +152,7 @@ class EquationChallenge extends Challenge {
     };
   }
 
-  private static generateQuotien(): ChallengeShape {
+  public static generateQuotien(): ChallengeShape {
     if (Math.random() >= 2 / 3) {
       /* We want to solve: (kx + q) / (k2*x + q2) = k3*x + q3
           If we try to simplify this expression it gives:
@@ -178,7 +214,6 @@ class EquationChallenge extends Challenge {
       const prompt = `(${pos.ltop})/(${pos.lbottom})=${pos.right}`;
 
       return {
-        type: "equation",
         prompt,
         answer: answer.toString(),
         solution_set: answer_set.map((x) => x.toString()),
@@ -239,7 +274,6 @@ class EquationChallenge extends Challenge {
     }=${isSwitch ? bot : right}`.replace(new RegExp("*", "gi"), "");
 
     return {
-      type: "equation",
       prompt,
       answer: answer.toString(),
       solution_set: [answer.toString()],
@@ -247,7 +281,7 @@ class EquationChallenge extends Challenge {
     };
   }
 
-  private static generateExp(easy: boolean): ChallengeShape {
+  public static generateExp(easy: boolean): ChallengeShape {
     if (easy) {
       const generate0Affine = (): ChallengeShape => {
         const a = RandInt(-10, 10);
@@ -272,7 +306,6 @@ class EquationChallenge extends Challenge {
 
       const answer = X.answer; // exp(X) = 1 (exp(0)) <=> X = 0
       return {
-        type: "equation",
         prompt,
         answer: answer,
         solution_set: [answer],
@@ -312,7 +345,6 @@ class EquationChallenge extends Challenge {
       );
 
       return {
-        type: "equation",
         prompt: `${isExpo ? "e" : d}^${a}x${b < 0 ? "" : "+"}${b}=${Y}`,
         answer: answer,
         solution_set: [answer],
@@ -357,7 +389,6 @@ class EquationChallenge extends Challenge {
     );
 
     return {
-      type: "equation",
       prompt: `${isExpo ? "e" : d}^(${a}x^2${b < 0 ? "" : "+"}${b}x${
         c < 0 ? "" : "+"
       }${c})=${Y}`,
@@ -367,7 +398,7 @@ class EquationChallenge extends Challenge {
     };
   }
 
-  private static generateCosSin(): ChallengeShape {
+  public static generateCosSin(): ChallengeShape {
     type opsType = ("cos" | "sin" | "tan")[];
     const ops: opsType = suffleArray(["cos", "sin", "tan"], 2);
 
@@ -423,7 +454,6 @@ class EquationChallenge extends Challenge {
       closestAnswer = undefined;
 
     return {
-      type: "equation",
       prompt,
       answer: (closestAnswer === undefined ? NaN : closestAnswer).toString(), // no "??" in espruino interpreter -_-
       solution_set: [
@@ -432,40 +462,11 @@ class EquationChallenge extends Challenge {
       fake_answers: generateFakeAnswers(closestAnswer || 0, 10, false),
     };
   }
-
-  public static generate(complexity: Difficulty): ChallengeShape {
-    return this.generateCosSin();
-    /*
-      EASY: linear/affine equation, easy 2nd degree: "5x² - 8x = 0" -> "x(5x - 8) = 0"
-      MEDIUM: quadradic equation, division eq
-      HARD: exp(x), ln(x)
-    */
-    if (complexity === Difficulty.EASY) {
-      return Math.random() >= 0.75
-        ? this.generateAffine()
-        : this.generateQuadradic(true);
-    }
-    if (complexity === Difficulty.MEDIUM)
-      return Math.random() >= 0.5
-        ? this.generateQuotien()
-        : this.generateQuadradic(false);
-    return this.generateQuotien();
-  }
 }
 
 class AlgebraChallenge extends Challenge {
-  public static generate(complexity: Difficulty): ChallengeShape {
-    return this.generateLnExpr();
-    /* Complex Numbers Algebra, must be in hard mode, happen 15% of the time */
-    if (complexity === Difficulty.HARD && Math.random() >= 0.85)
-      return this.generateComplex();
-
-    /* Real Numbers Algebra */
-    return this.generateReal(complexity);
-  }
-
   /* Complex Numbers Algebra */
-  private static generateComplex(): ChallengeShape {
+  public static generateComplex(): ChallengeShape {
     const op = RandOperation(true, false, false);
 
     let complexA = new ComplexNumber(RandInt(-100, 100), RandInt(-100, 100));
@@ -498,7 +499,6 @@ class AlgebraChallenge extends Challenge {
     }
 
     return {
-      type: "complex_algebra",
       prompt,
       answer: answer.toString(),
       solution_set: [answer.toString()],
@@ -507,7 +507,7 @@ class AlgebraChallenge extends Challenge {
   }
 
   /* Real Numbers Algebra */
-  private static generateLnExpr(): ChallengeShape {
+  public static generateLnExpr(): ChallengeShape {
     let prompt = "";
     let answer: number | undefined;
     for (let i = 0; i < 3; i++) {
@@ -540,7 +540,6 @@ class AlgebraChallenge extends Challenge {
 
     answer = Math.round(answer as number);
     return {
-      type: "algebra",
       prompt,
       answer: `ln(${(answer as number).toString()})`,
       solution_set: [(answer as number).toString()],
@@ -550,7 +549,7 @@ class AlgebraChallenge extends Challenge {
     };
   }
 
-  private static generatePowerExpr(): ChallengeShape {
+  public static generatePowerExpr(): ChallengeShape {
     const base = RandInt(1, 9);
 
     let prompt = "";
@@ -583,7 +582,6 @@ class AlgebraChallenge extends Challenge {
     const isInversed = Math.random() >= 0.8;
     const isSqrt = !isInversed && Math.random() >= 0.8;
     return {
-      type: "algebra",
       prompt,
       answer: (answer as PowerNumber).toString(isInversed, isSqrt),
       solution_set: [(answer as PowerNumber).toString(false, false)],
@@ -593,7 +591,7 @@ class AlgebraChallenge extends Challenge {
     };
   }
 
-  private static generateReal(complexity: Difficulty): ChallengeShape {
+  public static generateReal(complexity: Difficulty): ChallengeShape {
     const hardAlgebra = complexity >= Difficulty.MEDIUM;
     const opLen = RandInt(1, complexity + 1); // easy will be 1, medium 2, hard 3 expressions
 
@@ -657,7 +655,6 @@ class AlgebraChallenge extends Challenge {
     const answer = computeExpr(jsprompt);
     return {
       prompt: userprompt,
-      type: "algebra",
       answer: answer.toString(),
       solution_set: [`${answer}`],
       fake_answers: generateFakeAnswers(answer, hardAlgebra ? 10 : 100, true),

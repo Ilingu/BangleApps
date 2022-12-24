@@ -1,30 +1,29 @@
 /**
- * @class - singleton
+ * @class singleton
  */
 class QuickMath {
-  public readonly complexity: Difficulty;
+  public readonly config = globalConfig;
   private static gameInstance: QuickMath;
 
   private score = 0;
 
-  private constructor(complexity: Difficulty) {
-    this.complexity = complexity;
-  }
+  private constructor() {}
 
   public get userScore() {
     return this.score;
   }
 
-  static newGame(complexity: Difficulty): QuickMath {
+  static newGame(): QuickMath {
     if (!this.gameInstance) {
-      this.gameInstance = new this(complexity);
+      this.gameInstance = new this();
     }
 
+    this.gameInstance.newChallenge(); // launch the game
     return this.gameInstance;
   }
 
-  public newChallenge(): void {
-    const challenge = new Challenge(this.complexity, "algebra");
+  private newChallenge(): void {
+    const challenge = new Challenge(this.config);
 
     const displayInfo = challenge.display();
     if (displayInfo === undefined || displayInfo.rightPos === undefined)
