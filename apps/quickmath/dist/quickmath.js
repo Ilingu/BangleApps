@@ -272,7 +272,7 @@ class EquationChallenge extends Challenge {
             }
         }
         const isSwitch = Math.random() >= 0.5;
-        const prompt = `(${top})/${isSwitch ? "" : "("}${isSwitch ? right : bot}${isSwitch ? "" : ")"}=${isSwitch ? bot : right}`.replace(new RegExp("*", "gi"), "");
+        const prompt = `(${top})/${isSwitch ? "" : "("}${isSwitch ? right : bot}${isSwitch ? "" : ")"}=${isSwitch ? bot : right}`.replace(/\*/gi, "");
         return {
             prompt,
             answer: answer.toString(),
@@ -325,7 +325,6 @@ class EquationChallenge extends Challenge {
         const Yextremum = Math.ceil(isExpo
             ? Math.exp(-Math.pow(b, 2) / (4 * a) + c)
             : Math.pow(d, -Math.pow(b, 2) / (4 * a) + c));
-        console.log({ Yextremum, a, b, c, d, isExpo });
         const Y = RandInt(a > 0 ? Yextremum : 1, a > 0 ? 1e6 : Yextremum);
         const result = isExpo
             ? resolveQuadradic(a, b, -Math.log(Y) + c)
@@ -382,7 +381,6 @@ class EquationChallenge extends Challenge {
                 closestAnswer = angle;
             }
         }
-        console.log({ closestAnswer, closestGap, prompt, jsPrompt });
         if (!prompt.includes("tan") &&
             (closestGap === undefined ? 1 : closestGap) >= 1)
             closestAnswer = undefined;
@@ -717,7 +715,6 @@ class Display {
     static displayChallenge(challenge, options) {
         if (!challenge)
             return;
-        console.log(challenge.answer);
         if (challenge.fake_answers.length < 3)
             return;
         if (challenge.answer.length <= 0)

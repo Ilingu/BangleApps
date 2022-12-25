@@ -283,7 +283,7 @@ class EquationChallenge extends Challenge {
     const isSwitch = Math.random() >= 0.5;
     const prompt = `(${top})/${isSwitch ? "" : "("}${isSwitch ? right : bot}${
       isSwitch ? "" : ")"
-    }=${isSwitch ? bot : right}`.replace(new RegExp("*", "gi"), "");
+    }=${isSwitch ? bot : right}`.replace(/\*/gi, "");
 
     return {
       prompt,
@@ -384,7 +384,6 @@ class EquationChallenge extends Challenge {
         ? Math.exp(-Math.pow(b, 2) / (4 * a) + c)
         : Math.pow(d, -Math.pow(b, 2) / (4 * a) + c)
     ); // beyond Ymax there is no solution x real
-    console.log({ Yextremum, a, b, c, d, isExpo });
     const Y = RandInt(a > 0 ? Yextremum : 1, a > 0 ? 1e6 : Yextremum); // there is no negative Y value (ln(Y))
 
     const result = isExpo
@@ -458,7 +457,6 @@ class EquationChallenge extends Challenge {
       }
     }
 
-    console.log({ closestAnswer, closestGap, prompt, jsPrompt });
     if (
       !prompt.includes("tan") &&
       (closestGap === undefined ? 1 : closestGap) >= 1

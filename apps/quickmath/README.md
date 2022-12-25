@@ -2,6 +2,8 @@
 
 #### ➡ Quickmath - Practice your math skills!
 
+#### ➡ Install it [here](https://ilingu.github.io/BangleAppLoader/?q=quickmath)!
+
 ## Desciption/Purpose
 
 This is a mini quiz/math game developed only for the [Bangle.js 2](https://www.espruino.com/Bangle.js2) open smart hackable watch.

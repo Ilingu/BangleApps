@@ -152,7 +152,6 @@ class Display {
     options?: displayChallengeOptions
   ): displayChallengeReturn | undefined {
     if (!challenge) return;
-    console.log(challenge.answer);
     if (challenge.fake_answers.length < 3) return;
     if (challenge.answer.length <= 0) return;
 

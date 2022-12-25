@@ -19,7 +19,6 @@
   "tags": "game",
   "supports": ["BANGLEJS2"],
   "readme": "README.md",
-  "allow_emulator": true,
   "storage": [
     { "name": "quickmath.app.js", "url": "quickmath.js" },
     { "name": "quickmath.img", "url": "quickmath-icon.js", "evaluate": true }
