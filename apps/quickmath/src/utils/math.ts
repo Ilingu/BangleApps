@@ -78,7 +78,7 @@ const fx = (fn: string, variable: "x" | "y" | "n") =>
 const computeDerivative = (fn: string, x: number): number => {
   const f = fx(fn, "x");
   const h = 1e-8; // Step size
-  return Math.round((f(x + h) - f(x)) / h); // df
+  return (f(x + h) - f(x)) / h; // df
 };
 
 const resolveQuadradic = (

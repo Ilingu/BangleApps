@@ -1,4 +1,4 @@
-type ChallengeTypes = "arithmetic" | "equation" | "algebra";
+type ChallengeTypes = "arithmetic" | "equation" | "algebra" | "function";
 type EquationChallenges =
   | "affine"
   | "quadratic"
@@ -7,6 +7,7 @@ type EquationChallenges =
   | "cossin";
 type AlgebraChallenges = "complex" | "ln" | "power" | "real";
 type ArithmeticChallenges = "gcd";
+type FunctionChallenges = "derivatives";
 
 interface GameConfig {
   difficulty: Difficulty;
@@ -16,8 +17,15 @@ interface GameConfig {
       | EquationChallenges
       | AlgebraChallenges
       | ArithmeticChallenges
+      | FunctionChallenges
     )[];
   };
+}
+
+interface FunctionShape {
+  uprompt: string;
+  jsprompt: string;
+  type: "polynomial" | "ln" | "exp" | "constant";
 }
 
 enum Difficulty {

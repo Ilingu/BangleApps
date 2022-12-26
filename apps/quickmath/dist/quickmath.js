@@ -107,9 +107,15 @@ class QuickMath {
         });
     }
 }
+var _a;
 class Challenge {
     constructor(config) {
-        const RandType = () => suffleArray(["arithmetic", "equation", "algebra"])[RandInt(0, 2)];
+        const RandType = () => suffleArray([
+            "equation",
+            "algebra",
+            "arithmetic",
+            "function",
+        ])[RandInt(0, 3)];
         const RandExoByType = (type) => {
             const exo = generateExercises();
             let exercises = [];
@@ -117,8 +123,10 @@ class Challenge {
                 exercises = exo.EquationExercises;
             else if (type === "algebra")
                 exercises = exo.AlgebraExercises;
-            else
+            else if (type === "arithmetic")
                 exercises = exo.ArithmeticExercises;
+            else
+                exercises = exo.FunctionExercises;
             return suffleArray(exercises)[RandInt(0, exercises.length - 1)];
         };
         const RandExoUser = () => suffleArray(config.challenge.exercises)[RandInt(0, config.challenge.exercises.length - 1)];
@@ -150,8 +158,10 @@ class Challenge {
             else
                 this.challenge = Challenge.defaultChallenge();
         }
-        else
+        else if (type === "arithmetic")
             this.challenge = ArithmeticChallenge.generateGCD();
+        else
+            this.challenge = FunctionChallenge.generateDerivatives();
     }
     static defaultChallenge() {
         return {
@@ -178,6 +188,87 @@ class ArithmeticChallenge extends Challenge {
         };
     }
 }
+class FunctionChallenge extends Challenge {
+    static ln() {
+        const KAdd = RandInt(-10, 10);
+        const mult = RandInt(-10, 10, true);
+        const poly = Math.random() >= 0.8
+            ? this.polynomial(RandInt(1, 2))
+            : { uprompt: "x", jsprompt: "x", type: "ln" };
+        return {
+            uprompt: `${KAdd !== 0 ? KAdd : ""}+${mult}ln|${poly.uprompt}|`,
+            jsprompt: `${KAdd !== 0 ? KAdd : ""}+${mult}*Math.log(Math.abs(${poly.jsprompt}))`,
+            type: "ln",
+        };
+    }
+    static exp() {
+        const KAdd = RandInt(-10, 10);
+        const mult = RandInt(-10, 10, true);
+        const poly = Math.random() >= 0.9
+            ? { uprompt: "x", jsprompt: "x", type: "exp" }
+            : this.polynomial(RandInt(1, 2));
+        return {
+            uprompt: `${KAdd !== 0 ? KAdd : ""}+${mult}e^${poly.uprompt}`,
+            jsprompt: `${KAdd !== 0 ? KAdd : ""}+${mult}*Math.exp(${poly.jsprompt})`,
+            type: "exp",
+        };
+    }
+    static generateDerivatives() {
+        const RandType = () => suffleArray(["polynomial", "ln", "exp"], 2)[RandInt(0, 3)];
+        const RandMode = () => suffleArray(["u+v", "ku", "u*v", "u/v"], 2)[RandInt(0, 3)];
+        const mode = RandMode();
+        const u = this.newfn(RandType()), v = this.newfn(RandType());
+        let answer, fn;
+        const dx = RandInt(-10, 10, true);
+        if (mode === "u+v") {
+            fn = `${u.uprompt}+${v.uprompt}`;
+            answer = computeDerivative(`${u.jsprompt}+${v.jsprompt}`, dx);
+        }
+        else if (mode === "ku") {
+            const k = this.newfn("constant");
+            fn = `${k.uprompt}*(${u.uprompt})`;
+            answer = computeDerivative(`${k.jsprompt}*(${u.jsprompt})`, dx);
+        }
+        else if (mode === "u*v") {
+            fn = `(${u.uprompt})*(${v.uprompt})`;
+            answer = computeDerivative(`(${u.jsprompt})*(${v.jsprompt})`, dx);
+        }
+        else {
+            fn = `(${u.uprompt})/(${v.uprompt})`;
+            answer = computeDerivative(`(${u.jsprompt})/(${v.jsprompt})`, dx);
+        }
+        answer = parseFloat(trimFloating0(answer, 2));
+        if (Math.floor(Math.abs(answer) + 1) - Math.abs(answer) <= 0.01)
+            answer = Math.round(answer);
+        fn = fn.replace(/\*x/gi, "x").replace(/\+-/gi, "-");
+        return {
+            prompt: `f(x)=${fn}\nf'(${dx})?`,
+            answer: answer.toString(),
+            solution_set: [answer.toString()],
+            fake_answers: generateFakeAnswers(answer, 10, true),
+        };
+    }
+}
+_a = FunctionChallenge;
+FunctionChallenge.polynomial = (degree) => {
+    let jsprompt = "", uprompt = "";
+    for (let deg = degree; deg >= 0; deg--) {
+        const coef = RandInt(-10, 10, true);
+        jsprompt += `${coef}${deg === 0 ? "" : `*Math.pow(x,${deg})+`}`;
+        uprompt += `${coef === 1 ? "" : coef === -1 ? "-" : coef}${deg === 0 ? "" : `x${deg === 1 ? "" : `^${deg}`}+`}`;
+    }
+    return { uprompt, jsprompt, type: "polynomial" };
+};
+FunctionChallenge.newfn = (type) => {
+    if (type === "polynomial")
+        return _a.polynomial(RandInt(1, 3));
+    if (type === "exp")
+        return _a.exp();
+    if (type === "ln")
+        return _a.ln();
+    const k = RandInt(-10, 10, true).toString();
+    return { uprompt: k, jsprompt: k, type: "constant" };
+};
 class EquationChallenge extends Challenge {
     static generateAffine() {
         const isDecimal = Math.random() >= 0.9;
@@ -361,11 +452,11 @@ class EquationChallenge extends Challenge {
             }
         }
         jsPrompt = jsPrompt
-            .replace(/[\+-]+/gi, "-")
+            .replace(/\+-/gi, "-")
             .replace(/[\+]+$/, "")
             .replace(/[-]+$/, "");
         prompt = prompt
-            .replace(/[\+-]+/gi, "-")
+            .replace(/\+-/gi, "-")
             .replace(/[\+]+$/, "")
             .replace(/[-]+$/, "");
         const rightInterval = prompt.includes("tan") ? 100 : exprSize >= 2 ? 2 : 1;
@@ -839,6 +930,9 @@ const generateExercises = () => ({
     ArithmeticExercises: [
         globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null,
     ].filter((d) => d),
+    FunctionExercises: [
+        globalConfig.difficulty >= Difficulty.MEDIUM ? "derivatives" : null,
+    ].filter((d) => d),
 });
 const renderExerciseTypeMenu = () => {
     let fields = {};
@@ -859,6 +953,8 @@ const renderExerciseTypeMenu = () => {
         renderFields(exo.AlgebraExercises);
     if (globalConfig.challenge.type === "arithmetic")
         renderFields(exo.ArithmeticExercises);
+    if (globalConfig.challenge.type === "function")
+        renderFields(exo.FunctionExercises);
     const menu = Object.assign({
         "": { title: "Exercises Type", selected: 1 },
     }, fields, {
@@ -870,7 +966,9 @@ const renderExerciseTypeMenu = () => {
                     ? exo.EquationExercises
                     : globalConfig.challenge.type === "algebra"
                         ? exo.AlgebraExercises
-                        : exo.ArithmeticExercises;
+                        : globalConfig.challenge.type === "arithmetic"
+                            ? exo.ArithmeticExercises
+                            : exo.FunctionExercises;
             QuickMath.newGame();
         },
         "< Back": () => E.showMenu(renderChallengeTypeMenu()),
@@ -892,6 +990,10 @@ const renderChallengeTypeMenu = () => {
             globalConfig.challenge.type = "arithmetic";
             E.showMenu(renderExerciseTypeMenu());
         },
+        Function: () => {
+            globalConfig.challenge.type = "function";
+            E.showMenu(renderExerciseTypeMenu());
+        },
         Random: () => {
             E.showMenu();
             g.clear();
@@ -900,8 +1002,10 @@ const renderChallengeTypeMenu = () => {
         },
         "< Back": () => E.showMenu(mainMenu),
     };
-    if (globalConfig.difficulty <= Difficulty.EASY)
+    if (globalConfig.difficulty <= Difficulty.EASY) {
         delete menu.Arithmetic;
+        delete menu.Function;
+    }
     return menu;
 };
 var PowerOps;
@@ -1015,7 +1119,7 @@ const fx = (fn, variable) => new Function(variable, `return (${fn})`);
 const computeDerivative = (fn, x) => {
     const f = fx(fn, "x");
     const h = 1e-8;
-    return Math.round((f(x + h) - f(x)) / h);
+    return (f(x + h) - f(x)) / h;
 };
 const resolveQuadradic = (a, b, c) => {
     const delta = Math.pow(b, 2) - 4 * a * c;

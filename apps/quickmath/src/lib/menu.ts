@@ -21,12 +21,15 @@ const generateExercises = () => ({
       globalConfig.difficulty >= Difficulty.MEDIUM ? "gcd" : null, // medium and more
     ] as ArithmeticChallenges[]
   ).filter((d) => d),
+  FunctionExercises: (
+    [
+      globalConfig.difficulty >= Difficulty.MEDIUM ? "derivatives" : null, // medium and more
+    ] as FunctionChallenges[]
+  ).filter((d) => d),
 });
 const renderExerciseTypeMenu = () => {
   let fields: Record<string, () => void> = {};
-  const renderFields = (
-    exercise: (EquationChallenges | AlgebraChallenges | ArithmeticChallenges)[]
-  ) => {
+  const renderFields = (exercise: GameConfig["challenge"]["exercises"]) => {
     exercise.forEach((txt) => {
       fields[txt] = () => {
         E.showMenu();
@@ -44,6 +47,8 @@ const renderExerciseTypeMenu = () => {
     renderFields(exo.AlgebraExercises);
   if (globalConfig.challenge.type === "arithmetic")
     renderFields(exo.ArithmeticExercises);
+  if (globalConfig.challenge.type === "function")
+    renderFields(exo.FunctionExercises);
 
   // Espruino interpreter don't support the spread operator 😭
   const menu = Object.assign(
@@ -60,7 +65,9 @@ const renderExerciseTypeMenu = () => {
             ? exo.EquationExercises
             : globalConfig.challenge.type === "algebra"
             ? exo.AlgebraExercises
-            : exo.ArithmeticExercises;
+            : globalConfig.challenge.type === "arithmetic"
+            ? exo.ArithmeticExercises
+            : exo.FunctionExercises;
         QuickMath.newGame();
       },
       "< Back": () => E.showMenu(renderChallengeTypeMenu()),
@@ -84,6 +91,10 @@ const renderChallengeTypeMenu = () => {
       globalConfig.challenge.type = "arithmetic";
       E.showMenu(renderExerciseTypeMenu());
     },
+    Function: () => {
+      globalConfig.challenge.type = "function";
+      E.showMenu(renderExerciseTypeMenu());
+    },
     Random: () => {
       E.showMenu();
       g.clear();
@@ -93,6 +104,9 @@ const renderChallengeTypeMenu = () => {
     "< Back": () => E.showMenu(mainMenu),
   };
 
-  if (globalConfig.difficulty <= Difficulty.EASY) delete menu.Arithmetic;
+  if (globalConfig.difficulty <= Difficulty.EASY) {
+    delete menu.Arithmetic;
+    delete menu.Function;
+  }
   return menu;
 };
